@@ -888,7 +888,7 @@ let mainSortBy='default'; // 'default' | 'recent' | 'topic' | 'number'
 let sortDir='asc'; // 'asc' | 'desc' — applies to recent/number sorts
 
 
-// MCQ helper — reads quiz questions from article object's mcq field
+// MCQ helper — reads quiz from article object
 function getMCQ(id){ const r=ARTICLES_DATA.find(x=>x.id==id); return (r&&r.mcq&&r.mcq.length)?r.mcq:null; }
 ;
 

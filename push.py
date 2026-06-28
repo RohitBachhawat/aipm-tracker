@@ -67,10 +67,14 @@ def inject_article(articles_js, article):
     # Escape backticks in cc content
     cc_safe = article.get("cc", "").replace("`", "\\`").replace("${", "\\${")
 
+    mcq_data = article.get("mcq", [])
+    mcq_js_data = json.dumps(mcq_data, ensure_ascii=False) if mcq_data else "[]"
+
     obj = f"""
 ,{{readOrder:{article['readOrder']},stage:"{article['stage']}",id:{article['id']},addedOn:"{article['addedOn']}",tags:{tags_js},src:"{article['src']}",p:"{article['p']}",title:"{article['title']}",url:"{article['url']}",iq:"{article['iq']}",kt:"{article['kt']}"
 ,cc:`{cc_safe}`
-,ccDate:"{article['ccDate']}"{mcq_js}
+,ccDate:"{article['ccDate']}"
+,mcq:{mcq_js_data}
 }}"""
 
     return articles_js[:insert_pos] + obj + articles_js[insert_pos:]
