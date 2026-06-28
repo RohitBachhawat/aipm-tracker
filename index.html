@@ -868,7 +868,7 @@ body.dark .gbtn{background:var(--text-primary);color:var(--stn-color);}
 <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
 
 
-<!-- Data files - only edit these to add content -->
+<!-- Data -->
 <script src="data/articles.js"></script>
 <script src="data/exdb.js"></script>
 
@@ -887,6 +887,1087 @@ let searchQ='';
 let mainSortBy='default'; // 'default' | 'recent' | 'topic' | 'number'
 let sortDir='asc'; // 'asc' | 'desc' — applies to recent/number sorts
 
+
+// MCQ helper — reads quiz questions from article object's mcq field
+function getMCQ(id){ const r=ARTICLES_DATA.find(x=>x.id==id); return (r&&r.mcq&&r.mcq.length)?r.mcq:null; }
+;
+
+
+// ── Add read-time estimates (words × reading speed)
+const READ_TIME = {
+  1:8,2:7,3:5,4:4,5:4,6:5,7:5,8:6,9:7,10:6,11:6,12:7,13:7,
+  18:6,19:7,20:6,21:5,22:6,23:6,26:7,27:7,28:7,29:6,30:7,31:7,32:6,33:7,34:6,35:6,
+  36:6,37:7,38:6,39:5,40:6,41:7,42:6,43:6,44:7,45:5,46:6,47:7,48:6,49:7,50:6,
+  51:6,52:7,53:6,54:6,55:7,56:6,57:6,58:13,59:21,60:25,61:21,62:8,63:10,64:8,65:6,66:6,67:7,68:7,69:7,70:8,71:7,72:13,73:9,74:5,75:66,76:6,77:17,78:8,79:33,
+  80:9,81:7,
+  86:12,
+  83:7,
+  84:10,
+  85:15,
+  91:9,
+  88:8,
+  93:10,
+  94:10,
+  95:11,
+  89:12,
+  101:14,
+  102:8,
+  103:9,
+  104:3,
+  107:9,
+  109:12,
+  90:15,
+  92:12,
+  96:10,
+  97:10,
+  110:9,
+  105:8,
+  106:7,
+  108:11,
+  111:8,
+  112:5,
+  113:7,
+  114:6,
+};
+
+let state={},cf='to-read',srcFilter='',topicFilter='',op={};
+let _saveTimer=null;
+
+async function initState(){
+  try{
+    const r=await window.storage.get(DK);
+    state=r?JSON.parse(r.value):{};
+  }catch(e){state={};}
+  // Show backup banner if user has saved data
+  if(Object.keys(state).length>0){
+    const b=document.getElementById('backupBanner');
+    if(b)b.style.display='flex';
+  }
+  cf='to-read';
+  // Backfill insightsDate for articles that have insights but no date yet
+  const today=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+  RES.forEach(r=>{
+    if(gs(r.id,'insights',null)&&!gs(r.id,'insightsDate',null)){
+      if(!state[r.id])state[r.id]={};
+      state[r.id].insightsDate=today;
+    }
+  });
+
+  ss(state);
+  render();
+  refreshTopicDropdown();
+}
+
+function ss(s){
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{await window.storage.set(DK,JSON.stringify(s));}catch(e){}
+  },300);
+}
+const gs=(id,k,d)=>(state[id]&&state[id][k]!==undefined)?state[id][k]:d;
+const gst=id=>gs(id,'status','to-read');
+const gn=id=>gs(id,'notes','');
+const gnu=id=>gs(id,'notUseful',false);
+const gsm=id=>gs(id,'summary',null);
+function set(id,k,v){if(!state[id])state[id]={};state[id][k]=v;ss(state);}
+
+function toggleStatus(id){
+  const newStatus=gst(id)==='done'?'to-read':'done';
+  set(id,'status',newStatus);
+  if(newStatus==='done'){
+    set(id,'doneAt',Date.now());
+    if(gs(id,'queued',false)){
+      set(id,'queued',false);
+      showToast('✓ Marked as done & removed from queue');
+    } else {
+      showToast('✓ Marked as done');
+    }
+    // scroll next card into view
+    const vis=RES.filter(r=>!gnu(r.id)&&gst(r.id)!=='done');
+    const sorted=[...vis].sort((a,b)=>(a.readOrder||999)-(b.readOrder||999));
+    const next=sorted.find(r=>r.id!==id);
+    if(next){
+      render();
+      requestAnimationFrame(()=>{
+        const el=document.getElementById('card-'+next.id);
+        if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+      });
+      return;
+    }
+  } else {
+    set(id,'doneAt',null);
+    showToast('↩ Moved back to reading list');
+  }
+  render();
+}
+function markNU(id){set(id,'notUseful',true);op={};render();}
+function toggleQueue(id){
+  const cur=gs(id,'queued',false);
+  set(id,'queued',!cur);
+  showToast(cur?'Removed from queue':'🔖 Added to next reads');
+  render();
+}
+function clearQueue(){
+  RES.forEach(r=>{if(gs(r.id,'queued',false)){set(r.id,'queued',false);}});
+  render();
+  showToast('Queue cleared');
+}
+function getQueuedIds(){
+  return RES.filter(r=>gs(r.id,'queued',false)).map(r=>r.id);
+}
+function updateQueueUI(){
+  const ids=getQueuedIds();
+  const strip=document.getElementById('queueStrip');
+  const lbl=document.getElementById('queueStripLabel');
+  if(strip)strip.style.display=ids.length?'flex':'none';
+  if(lbl)lbl.textContent=ids.length+' article'+(ids.length!==1?'s':'')+' queued';
+}
+function toggleVI(id){
+  const cur=gs(id,'veryImportant',false);
+  set(id,'veryImportant',!cur);
+  showToast(cur?'Removed Very Important mark':'⚡ Marked as Very Important!');
+  render();
+}
+function restoreCard(id){set(id,'notUseful',false);render();}
+
+// ── Title case + colour helpers ───────────────────────────────────────────────
+function toTitleCase(str){
+  return str.replace(/\w\S*/g,w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
+}
+const CHIP_COLORS=['tc-blue','tc-sage','tc-amber','tc-rose'];
+const CO_COLORS=['cc-blue','cc-sage','cc-amber','cc-rose'];
+function strHash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h;}
+function chipColor(t){return CHIP_COLORS[strHash(t)%CHIP_COLORS.length];}
+function coColor(c){return CO_COLORS[strHash(c)%CO_COLORS.length];}
+
+// ── Topic helpers ────────────────────────────────────────────────────────────
+function gtopics(id){
+  // Use built-in article tags from RES data; no manual overrides
+  const r=RES.find(x=>x.id===id);
+  return (r&&r.tags)||[];
+}
+function getAllTopics(){
+  const all=new Set();
+  RES.forEach(r=>{gtopics(r.id).forEach(t=>all.add(t));});
+  return [...all].sort((a,b)=>a.localeCompare(b));
+}
+
+function setTopicFilter(t){
+  topicFilter=t;closeDds();
+  const btn=document.getElementById('topicBtn');
+  const lbl=document.getElementById('topicLbl');
+  if(lbl)lbl.textContent=t||'All topics';
+  if(btn)btn.classList.toggle('active',!!t);
+  refreshTopicDropdown();
+  render();
+}
+function refreshTopicDropdown(){
+  const list=document.getElementById('topicList');
+  const searchInput=document.getElementById('topicSearchInput');
+  if(!list)return;
+  const topics=getAllTopics();
+  if(searchInput)searchInput.style.display=topics.length?'':'none';
+  if(!topics.length){
+    list.innerHTML='<div class="fdd-item" style="color:var(--text-muted);font-size:12px;font-style:italic;">No topics yet — tag articles first</div>';
+    return;
+  }
+  const q=(searchInput&&searchInput.value||'').trim().toLowerCase();
+  const filtered=q?topics.filter(t=>t.toLowerCase().includes(q)):topics;
+  const items=filtered.map(t=>{
+    const esc=t.replace(/"/g,'&quot;');
+    const sel=topicFilter===t?' sel':'';
+    return '<div class="fdd-item'+sel+'" onclick="setTopicFilter(topicFilter===&quot;'+esc+'&quot;?&quot;&quot;:&quot;'+esc+'&quot;)"><span style="font-size:12px;opacity:.5;">#</span>'+t+'</div>';
+  }).join('')||'<div class="fdd-item" style="color:var(--text-muted);font-size:12px;font-style:italic;">No matching topics</div>';
+  const clear='<div class="fdd-clear"><div class="fdd-item" onclick="setTopicFilter(&quot;&quot;)" style="color:var(--text-muted);"><span style="font-size:12px;">✕</span>Clear</div></div>';
+  list.innerHTML=items+(topicFilter?clear:'');
+}
+
+function filterTopicDropdown(q){
+  refreshTopicDropdown();
+}
+
+function filterSrcDropdown(q){
+  const list=document.getElementById('srcList');
+  if(!list)return;
+  const sq=(q||'').trim().toLowerCase();
+  const items=list.querySelectorAll('.fdd-item[data-src]');
+  items.forEach(el=>{
+    const label=el.getAttribute('data-src')||'';
+    el.style.display=(!sq||label.toLowerCase().includes(sq))?'':'none';
+  });
+}
+
+function doAddTag(id){
+  const inp=document.getElementById('taginp-'+id);
+  if(inp&&inp.value.trim()){addTopic(id,inp.value);inp.value='';}
+}
+
+// ── Modal state ───────────────────────────────────────────────────────────────
+let _modalId=null;
+let _noteTimer=null;
+let _aiCollapsed=false;
+
+function openCompact(id){
+  set(id,'lastRead',new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'}));
+  _loadCmSource(id);
+  openModal('compactModal');
+  try{history.pushState(null,'','#compact-'+id);}catch(e){}
+}
+
+function openNotes(id){
+  _modalId=id;
+  const r=RES.find(x=>x.id===id);if(!r)return;
+  set(id,'lastRead',new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'}));
+  const notes=gn(id);
+  const sm=gsm(id);
+  document.getElementById('nmTitle').textContent='#'+id+' '+r.title;
+  document.getElementById('nmLink').href=r.url;
+  const ta=document.getElementById('nmTextarea');
+  ta.value=notes;
+  const gb=document.getElementById('nmGenBtn');
+  gb.disabled=!notes.trim();
+  document.getElementById('nmGenLabel').textContent=sm?'Regenerate':'Generate summary';
+  document.getElementById('nmCharCount').textContent=notes?notes.length+' chars':'';
+  // AI review
+  const aiSec=document.getElementById('nmAiSection');
+  const aiBody=document.getElementById('nmAiBody');
+  if(sm){
+    aiSec.style.display='';
+    aiBody.innerHTML=renderSum(sm);
+    aiBody.classList.remove('collapsed');
+    _aiCollapsed=false;
+    document.getElementById('nmAiToggle').textContent='▾';
+  } else {
+    aiSec.style.display='none';
+  }
+  openModal('notesModal');
+  try{try{history.pushState(null,'','#notes-'+id);}catch(e){}}catch(e){}
+}
+
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function copyModalContent(titleId,bodyId,btnId){
+  const titleEl=document.getElementById(titleId);
+  const bodyEl=document.getElementById(bodyId);
+  if(!titleEl||!bodyEl)return;
+  const title=titleEl.textContent.trim();
+  const body=bodyEl.innerText.trim();
+  const text=title+'\n\n'+body;
+  const btn=document.getElementById(btnId);
+  const done=()=>{
+    if(!btn)return;
+    const orig=btn.innerHTML;
+    btn.innerHTML='✓ Copied';
+    setTimeout(()=>{btn.innerHTML=orig;},1500);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>{
+      try{
+        const ta=document.createElement('textarea');
+        ta.value=text;document.body.appendChild(ta);ta.select();
+        document.execCommand('copy');document.body.removeChild(ta);done();
+      }catch(e){}
+    });
+  } else {
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text;document.body.appendChild(ta);ta.select();
+      document.execCommand('copy');document.body.removeChild(ta);done();
+    }catch(e){}
+  }
+}
+
+// ── Quiz (MCQ) ────────────────────────────────────────────────────────────────
+let _qzId=null, _qzDone=new Set(), _qzCorrect=0;
+
+function openQuiz(id){
+  const qs=getMCQ(id);
+  if(!qs||!qs.length)return;
+  _qzId=id;_qzDone=new Set();_qzCorrect=0;
+  const r=RES.find(x=>x.id===id);
+  document.getElementById('qzTitle').textContent=r?r.title:'';
+  document.getElementById('qzResetBtn').style.display='none';
+  quizRender();
+  openModal('quizModal');
+}
+
+function quizRender(){
+  const qs=getMCQ(_qzId);
+  const body=document.getElementById('qzBody');
+  body.innerHTML='';
+  qs.forEach((q,i)=>{
+    const d=document.createElement('div');
+    d.className='qz-card';d.id='qzc'+i;
+    d.innerHTML=`<div class="qz-num" id="qzn${i}">Q${i+1} / ${qs.length}</div>
+<div class="qz-q">${q.q}</div>
+<div class="qz-opts">${q.o.map((o,j)=>`<div class="qz-opt" id="qzo${i}_${j}" onclick="quizAns(${i},${j})"><span class="qz-ltr">${'ABCD'[j]}</span><span>${o}</span></div>`).join('')}</div>
+<div class="qz-exp" id="qze${i}">${q.e}</div>`;
+    body.appendChild(d);
+  });
+  quizProgUpdate();
+}
+
+function quizAns(i,j){
+  if(_qzDone.has(i))return;
+  _qzDone.add(i);
+  const q=getMCQ(_qzId)[i];
+  const isOk=j===q.c;
+  if(isOk)_qzCorrect++;
+  [0,1,2,3].forEach(k=>{
+    const el=document.getElementById(`qzo${i}_${k}`);
+    if(!el)return;
+    if(k===q.c)el.classList.add('qz-ok');
+    else if(k===j)el.classList.add('qz-bad');
+    else el.classList.add('qz-dim');
+  });
+  document.getElementById(`qze${i}`).classList.add('on');
+  const tag=isOk?'<span class="qz-tag qz-tok">✓</span>':'<span class="qz-tag qz-tbad">✗</span>';
+  document.getElementById(`qzn${i}`).innerHTML=`Q${i+1} / ${getMCQ(_qzId).length} ${tag}`;
+  quizProgUpdate();
+  const total=getMCQ(_qzId).length;
+  if(_qzDone.size===total)setTimeout(quizShowScore,400);
+}
+
+function quizProgUpdate(){
+  const total=getMCQ(_qzId)?.length||0;
+  const pct=total?(_qzDone.size/total*100):0;
+  document.getElementById('qzProgFill').style.width=pct+'%';
+  document.getElementById('qzProgLabel').textContent=`${_qzDone.size} / ${total}`;
+}
+
+function quizShowScore(){
+  const total=getMCQ(_qzId).length;
+  const s=_qzCorrect;
+  const msgs=[
+    [0,3,"Below 4 — go back to the compact view, then retry."],
+    [4,5,"Getting there. Focus on the questions you got wrong."],
+    [6,7,"Solid. A couple of nuances still missing."],
+    [8,9,"Strong. You understand the concept well."],
+    [10,10,"Perfect. You are ready to answer this in an interview."]
+  ];
+  const msg=msgs.find(([a,b])=>s>=a&&s<=b)||msgs[0];
+  const card=document.createElement('div');
+  card.className='qz-score-card';
+  card.innerHTML=`<div class="qz-score-big">${s}/${total}</div><div class="qz-score-sub">Your score</div><div class="qz-score-msg">${msg[2]}</div>`;
+  document.getElementById('qzBody').prepend(card);
+  document.getElementById('qzBody').scrollTop=0;
+  document.getElementById('qzScoreLabel').textContent=`${s}/${total}`;
+  document.getElementById('qzScoreLabel').style.display='';
+  document.getElementById('qzResetBtn').style.display='';
+}
+
+function quizReset(){
+  _qzDone=new Set();_qzCorrect=0;
+  document.getElementById('qzResetBtn').style.display='none';
+  document.getElementById('qzScoreLabel').style.display='none';
+  quizRender();
+  document.getElementById('qzBody').scrollTop=0;
+}
+
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow='';
+  try{
+    if(location.hash)history.replaceState(null,'',location.pathname+location.search);
+  }catch(e){}
+  if(id==='notesModal')_modalId=null;
+}
+
+function handleModalOverlayClick(e,id){
+  if(e.target===document.getElementById(id))closeModal(id);
+}
+
+function toggleModalAI(){
+  _aiCollapsed=!_aiCollapsed;
+  document.getElementById('nmAiBody').classList.toggle('collapsed',_aiCollapsed);
+  document.getElementById('nmAiToggle').textContent=_aiCollapsed?'▸':'▾';
+}
+
+let _nmSaveTimer=null;
+function modalSaveN(){
+  if(_modalId===null)return;
+  const v=document.getElementById('nmTextarea').value;
+  set(_modalId,'notes',v);
+  const gb=document.getElementById('nmGenBtn');
+  if(gb)gb.disabled=!v.trim();
+  document.getElementById('nmCharCount').textContent=v.length?v.length+' chars':'';
+  clearTimeout(_nmSaveTimer);
+  _nmSaveTimer=setTimeout(()=>{
+    const s=document.getElementById('nmSaved');
+    if(s){s.classList.add('show');setTimeout(()=>s.classList.remove('show'),1500);}
+  },800);
+  // Update card button indicator
+  render();
+}
+
+async function callClaudeWithRetry(prompt,maxTokens){
+  const maxAttempts=3;
+  let lastErr;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:maxTokens,messages:[{role:"user",content:prompt}]})});
+      const data=await res.json();
+      if(data.error){
+        const msg=data.error.message||data.error.type||'API error';
+        const retriable=/overload|rate.?limit|529|429|timeout|exceeded_limit|concurrent/i.test(msg);
+        if(retriable&&attempt<maxAttempts){
+          lastErr=new Error(msg);
+          const delay=/exceeded_limit|concurrent/i.test(msg)?2000*attempt:800*attempt;
+          await new Promise(r=>setTimeout(r,delay));
+          continue;
+        }
+        throw new Error(msg);
+      }
+      if(!data.content)throw new Error('Unexpected response shape: '+JSON.stringify(data).slice(0,200));
+      return data;
+    }catch(e){
+      lastErr=e;
+      const retriable=/overload|rate.?limit|529|429|timeout|network|exceeded_limit|concurrent/i.test(e.message||'');
+      if(retriable&&attempt<maxAttempts){
+        const delay=/exceeded_limit|concurrent/i.test(e.message||'')?2000*attempt:800*attempt;
+        await new Promise(r=>setTimeout(r,delay));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
+}
+
+async function modalGenSum(){
+  if(_modalId===null)return;
+  const id=_modalId;
+  const notes=gn(id);if(!notes.trim())return;
+  const r=RES.find(x=>x.id===id);
+  const gb=document.getElementById('nmGenBtn');
+  const aiSec=document.getElementById('nmAiSection');
+  const aiBody=document.getElementById('nmAiBody');
+  gb.disabled=true;gb.innerHTML=`<span class="ld"><span></span><span></span><span></span></span>`;
+  aiSec.style.display='';
+  aiBody.classList.remove('collapsed');
+  _aiCollapsed=false;
+  document.getElementById('nmAiToggle').textContent='▾';
+  aiBody.innerHTML=`<div style="color:var(--text-muted);font-size:14px;font-style:italic;padding:.5rem 0;">Analysing your notes…</div>`;
+  const prompt=`You are an expert AI PM interview coach helping someone prepare for AI PM interviews at Indian tech companies (Swiggy, Flipkart, Meesho, Zomato, Myntra, Jio, Ola, etc.).
+
+Article: "${r.title}"
+Interview question it answers: "${r.iq}"
+Key takeaway: "${r.kt}"
+
+Their notes: "${notes}"
+
+Tasks:
+1. Rate understanding 0-100.
+2. Find 2-4 specific gaps they missed or explained imprecisely that would matter in an interview. For each: what was missing + correct answer in 1-2 sentences.
+3. Write a polished 60-second interview answer in natural spoken language. Include one Indian product example where relevant.
+
+Respond ONLY in JSON, no markdown, no backticks:
+{"score":75,"gaps":[{"what_was_missing":"...","correct_answer":"..."}],"interview_answer":"..."}`;
+  try{
+    const data=await callClaudeWithRetry(prompt,1000);
+    const raw=data.content.map(i=>i.text||'').join('');
+    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    set(id,'summary',parsed);
+    aiBody.innerHTML=renderSum(parsed);
+    gb.innerHTML=`<span>✦</span> <span id="nmGenLabel">Regenerate</span>`;gb.disabled=false;
+    showToast('✓ Summary saved');
+  }catch(e){
+    console.error('modalGenSum failed:',e);
+    const overloaded=/overload/i.test(e&&e.message||'');
+    const msg=overloaded?"Claude's servers are busy right now.":((e&&e.message)?e.message:'unknown error');
+    aiBody.innerHTML=`<div style="color:var(--rose);font-size:14px;">Something went wrong: ${msg} Please try again in a moment.</div>`;
+    gb.innerHTML=`<span>✦</span> <span id="nmGenLabel">Generate summary</span>`;gb.disabled=false;
+  }
+}
+
+// Handle URL hash on load (#compact-N or #notes-N)
+window.addEventListener('load',()=>{
+  const h=location.hash;
+  const cm=h.match(/^#compact-(\d+)$/);
+  const nm=h.match(/^#notes-(\d+)$/);
+  if(cm)setTimeout(()=>openCompact(parseInt(cm[1])),300);
+  if(nm)setTimeout(()=>openNotes(parseInt(nm[1])),300);
+});
+
+// Esc closes modal
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(document.getElementById('notesModal').classList.contains('open'))closeModal('notesModal');
+    else if(document.getElementById('compactModal').classList.contains('open'))closeModal('compactModal');
+  }
+});
+
+let _noteTimers={};
+
+
+function renderSum(p){
+  if(!p)return'';
+  const sc=p.score>=80?'var(--sage)':p.score>=60?'var(--amber)':'var(--rose)';
+  const g=(p.gaps||[]).map(g=>`<div style="margin-bottom:8px;padding:7px 10px;background:var(--rose-soft);border-radius:7px;border:.5px solid var(--rose-border);"><div style="font-size:12px;font-weight:500;color:var(--rose);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em;">Missing</div><div style="font-size:13.5px;color:var(--text-secondary);margin-bottom:4px;">${g.what_was_missing}</div><div style="font-size:12px;font-weight:500;color:var(--sage);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em;">Correct answer</div><div style="font-size:13.5px;color:var(--text-secondary);">${g.correct_answer}</div></div>`).join('');
+  return`<div style="margin-bottom:12px;"><div class="scr"><div class="sn" style="color:${sc}">${p.score}<span style="font-size:1rem;color:var(--text-muted)">/100</span></div><div style="font-size:13px;color:var(--text-secondary);">Understanding score based on your notes</div></div></div>${g?`<div style="margin-bottom:12px;"><div class="sl2">Gaps to fix</div>${g}</div>`:''}<div><div class="sl2">Your 60-second interview answer</div><div style="background:var(--sage-soft);border:.5px solid var(--sage-border);border-radius:8px;padding:.75rem 1rem;font-size:14px;color:var(--text-primary);line-height:1.7;">${p.interview_answer}</div></div>`;
+}
+
+function setTab(t){cf=t;render();}
+function toggleDd(id){
+  const dd=document.getElementById(id);
+  const btn=dd.querySelector('.fdd-btn');
+  const menu=dd.querySelector('.fdd-menu');
+  const isOpen=menu.classList.contains('open');
+  // Close all dropdowns first
+  document.querySelectorAll('.fdd-menu').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.fdd-btn').forEach(b=>b.classList.remove('open'));
+  if(!isOpen){menu.classList.add('open');btn.classList.add('open');}
+  // Clear search inputs when closing
+  if(isOpen){
+    const si=document.getElementById('srcSearchInput');
+    if(si){si.value='';filterSrcDropdown('');}
+    const ti=document.getElementById('topicSearchInput');
+    if(ti){ti.value='';filterTopicDropdown('');}
+  }
+}
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.fdd')){
+    document.querySelectorAll('.fdd-menu').forEach(m=>m.classList.remove('open'));
+    document.querySelectorAll('.fdd-btn').forEach(b=>b.classList.remove('open'));
+    const si=document.getElementById('srcSearchInput');
+    if(si){si.value='';filterSrcDropdown('');}
+    const ti=document.getElementById('topicSearchInput');
+    if(ti){ti.value='';filterTopicDropdown('');}
+  }
+});
+function setSrc(s){
+  srcFilter=s;
+  closeDds();
+  const btn=document.getElementById('srcBtn');
+  const lbl=document.getElementById('srcLbl');
+  const srcNames={'technomanagers':'Technomanagers','japm':'JustAnotherPM','aakash':'Aakash G','eugeneyan':'Eugene Yan','benedictevans':'Benedict Evans','lennysnewsletter':"Lenny's Newsletter",'hameldev':'Hamel.dev','karpathy':'Karpathy','chiphuyen':'Chip Huyen','':'All sources'};
+  if(lbl)lbl.textContent=srcNames[s]||'All sources';
+  if(btn)btn.classList.toggle('active',!!s);
+  // Update checkmarks
+  document.querySelectorAll('#srcMenu .fdd-item').forEach(it=>{
+    const onclick=it.getAttribute('onclick')||'';
+    const match=onclick.match(/setSrc\('([^']*)'\)/);
+    it.classList.toggle('sel',match&&match[1]===s&&s!=='');
+  });
+  render();
+}
+
+function setMainSort(s){
+  mainSortBy=s;
+  closeDds();
+  const labels={default:'Default',recent:'Recently updated',number:'Article number'};
+  const lbl=document.getElementById('sortLbl');
+  const btn=document.getElementById('sortBtn');
+  if(lbl)lbl.textContent=labels[s]||'Default';
+  if(btn)btn.classList.toggle('active',s!=='default');
+  // Update sel highlights
+  ['default','recent','number'].forEach(k=>{
+    const el=document.getElementById('sort-'+k);
+    if(el)el.classList.toggle('sel',k===s);
+  });
+  // Direction toggle only applies to recent/number sorts
+  const dirBtn=document.getElementById('sortDirBtn');
+  if(dirBtn)dirBtn.style.display=(s==='recent'||s==='number')?'':'none';
+  render();
+}
+
+function toggleSortDir(){
+  sortDir=sortDir==='asc'?'desc':'asc';
+  const icon=document.getElementById('sortDirIcon');
+  if(icon)icon.textContent=sortDir==='asc'?'↑':'↓';
+  const btn=document.getElementById('sortDirBtn');
+  if(btn)btn.classList.toggle('active',sortDir==='desc');
+  render();
+}
+
+function closeDds(){
+  document.querySelectorAll('.fdd-menu').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.fdd-btn').forEach(b=>b.classList.remove('open'));
+}
+function toggleNU(){
+  const l=document.getElementById('nuList');const c=document.getElementById('nuChev');
+  l.classList.toggle('open');c.textContent=l.classList.contains('open')?'▴':'▾';
+}
+
+
+function onSearch(q){
+  searchQ=q.trim().toLowerCase();
+  const clr=document.getElementById('searchClear');
+  if(clr)clr.style.display=searchQ?'block':'none';
+  render();
+  if(examplesOpen)renderExamplesView();
+}
+function toggleSearchOverlay(){
+  const overlay=document.getElementById('searchOverlay');
+  const btn=document.getElementById('searchToggleBtn');
+  if(!overlay)return;
+  const isOpen=overlay.classList.contains('open');
+  overlay.classList.toggle('open',!isOpen);
+  btn.classList.toggle('active',!isOpen);
+  if(!isOpen){setTimeout(()=>{const b=document.getElementById('searchBox');if(b)b.focus();},50);}
+}
+function clearSearch(){
+  searchQ='';
+  const box=document.getElementById('searchBox');
+  if(box)box.value='';
+  const clr=document.getElementById('searchClear');
+  if(clr)clr.style.display='none';
+  render();
+  if(examplesOpen)renderExamplesView();
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&document.activeElement.tagName!=='TEXTAREA'&&document.activeElement.tagName!=='INPUT'){
+    e.preventDefault();
+    const overlay=document.getElementById('searchOverlay');
+    if(overlay&&!overlay.classList.contains('open'))toggleSearchOverlay();
+    else{const b=document.getElementById('searchBox');if(b)b.focus();}
+  }
+  if(e.key==='Escape'){
+    if(searchQ){clearSearch();}
+    const overlay=document.getElementById('searchOverlay');
+    if(overlay&&overlay.classList.contains('open')){
+      overlay.classList.remove('open');
+      document.getElementById('searchToggleBtn').classList.remove('active');
+    }
+    document.activeElement.blur();
+  }
+});
+// Close search overlay on outside click — but NOT while user is typing in the box
+document.addEventListener('click',function(e){
+  const overlay=document.getElementById('searchOverlay');
+  const btn=document.getElementById('searchToggleBtn');
+  const searchBox=document.getElementById('searchBox');
+  // Don't close if click is inside overlay, on the toggle button, or on the search box itself
+  if(overlay&&overlay.classList.contains('open')
+    &&!overlay.contains(e.target)
+    &&e.target!==btn
+    &&e.target!==searchBox){
+    // Only close if there's no active search query (let user click results while searching)
+    if(!searchQ){
+      overlay.classList.remove('open');
+      if(btn)btn.classList.remove('active');
+    }
+  }
+});
+
+function hlText(text,q){
+  if(!q)return text;
+  const esc=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return text.replace(new RegExp('('+esc+')','gi'),'<span class="hl-match">$1</span>');
+}
+
+function srcLabel(src){
+  if(src==='doordash')return'DoorDash Engineering';
+  if(src==='attio')return'Attio Blog';
+  if(src==='zeptotechxpress')return'Zepto TechXPress';
+  if(src==='swiggybytes')return'Swiggy Bytes';
+  if(src==='uber')return'Uber Engineering';
+  if(src==='instacart')return'Instacart Engineering';
+  if(src==='technomanagers')return'Technomanagers';
+  if(src==='japm')return'JustAnotherPM';
+  if(src==='aakash')return'Aakash G';
+  if(src==='eugeneyan')return'Eugene Yan';
+  if(src==='benedictevans')return'Benedict Evans';
+  if(src==='lennysnewsletter')return"Lenny's Newsletter";
+  if(src==='hameldev')return'Hamel.dev';
+  if(src==='aienabledpm')return'AI Enabled PM';
+  if(src==='karpathy')return'Karpathy';
+  if(src==='chiphuyen')return'Chip Huyen';
+  if(src==='builderlab')return'Builder Lab';
+  if(src==='appliedllms')return'Applied LLMs';
+  return src;
+}
+
+function updateStats(){
+  const vis=RES.filter(r=>!gnu(r.id));
+  const dn=vis.filter(r=>gst(r.id)==='done').length;
+  const vi=vis.filter(r=>gs(r.id,'veryImportant',false)).length;
+  const tot=vis.length;
+  const pct=tot?Math.round(dn/tot*100):0;
+  document.getElementById('sT').textContent=tot;
+  document.getElementById('sD').textContent=dn;
+  document.getElementById('sR').textContent=tot-dn;
+  document.getElementById('sVI').textContent=vi;
+  const pb=document.getElementById('pb');
+  if(pb){pb.style.width=pct+'%';}
+  const lbl=document.getElementById('pbLbl');
+  if(lbl)lbl.textContent=pct>0?pct+'%':'';
+  // Sync stat card active states
+  ['to-read','done','all','vi'].forEach(t=>{
+    const el=document.getElementById('sc-'+t);
+    if(el)el.classList.toggle('active',cf===t);
+  });
+}
+function statTabClick(t){
+  cf=t;
+  render();
+}
+
+
+
+function mkCard(r){
+  const isDone=gst(r.id)==='done';
+  const isVI=gs(r.id,'veryImportant',false);
+  const isQueued=gs(r.id,'queued',false);
+  const topics=gtopics(r.id);
+  const notes=gn(r.id);const hasSm=!!gsm(r.id);
+  const hasCP=!!r.cc;
+  const rt=READ_TIME[r.id]||5;
+  const dt=r.date||'';
+  const titleHl=hlText(r.title,searchQ);
+  const ktHl=hlText(r.kt,searchQ);
+  const iqHl=hlText(r.iq,searchQ);
+  return`<div class="card ${isDone?'done-card':''}" id="card-${r.id}">
+<div class="card-header">
+  <div class="card-badges">
+    <span class="src-badge ${r.src}">${srcLabel(r.src)}</span>
+    ${isVI?'<span class="vi-badge"><span style="font-size:11px;">⚡</span> Very Important</span>':''}
+    ${isQueued?'<span class="queue-badge">🔖 Up next</span>':''}
+  </div>
+  <div class="card-right">
+    ${dt?`<span class="read-time">${dt} <span style="opacity:.35;margin:0 1px;">|</span> ~${rt} min</span>`:`<span class="read-time">~${rt} min</span>`}
+    ${gs(r.id,'lastRead',null)?`<span class="last-read">↩ ${gs(r.id,'lastRead','')}</span>`:''}
+    ${isDone?'<span class="sbadge dn">✓ Done</span>':'<span class="sbadge tr">To read</span>'}
+  </div>
+</div>
+<div class="ctitle"><span class="serial">#${r.id}</span> <a href="${r.url}" target="_blank" rel="noopener">${titleHl} <span style="font-size:12px;opacity:.35;vertical-align:1px;">↗</span></a></div>
+<div class="iq"><span>Answers:</span> ${iqHl}</div>
+<div class="kt">${ktHl}</div>
+${topics.length?'<div class="topic-chips">'+topics.map(t=>'<span class="topic-chip '+chipColor(t)+'" onclick="setTopicFilter(topicFilter===\''+t+'\' ? \'\':\''+t+'\');" title="Filter by '+t+'"># '+toTitleCase(t)+'</span>').join('')+'</div>':''}
+<div class="div-line"></div>
+<div class="actions">
+  ${hasCP?`<button class="btn bcp" onclick="openCompact(${r.id})">Compact</button>`:''}
+  ${getMCQ(r.id)?`<button class="btn" style="color:var(--amber);" onclick="openQuiz(${r.id})">⊙ Test Yourself</button>`:''}
+  <button class="btn" onclick="openNotes(${r.id})">Notes${notes?' ✎':''}</button>
+  <button class="btn bq ${isQueued?'queued':''}" onclick="toggleQueue(${r.id})" title="${isQueued?'Remove from queue':'Add to next reads'}">${isQueued?'🔖 Queued':'🔖 Queue'}</button>
+</div>
+
+</div>`;
+}
+
+function matchesSearch(r){
+  if(!searchQ)return true;
+  // #N searches by article id (e.g. #50)
+  const idMatch=searchQ.match(/^#(\d+)$/);
+  if(idMatch)return r.id===parseInt(idMatch[1]);
+  // !vi or "important" shows only very important articles
+  if(searchQ==='!vi'||searchQ==='important')return gs(r.id,'veryImportant',false);
+  const haystack=(r.title+' '+r.iq+' '+r.kt+' '+r.src+' '+r.url).toLowerCase();
+  return haystack.includes(searchQ);
+}
+
+function render(){
+  updateStats();
+  let vis=RES.filter(r=>!gnu(r.id));
+  // When searching: show ALL articles regardless of active tab
+  if(!searchQ){
+    if(cf==='to-read')vis=vis.filter(r=>gst(r.id)==='to-read');
+    else if(cf==='done')vis=vis.filter(r=>gst(r.id)==='done');
+    else if(cf==='vi')vis=vis.filter(r=>gs(r.id,'veryImportant',false));
+  }
+  if(srcFilter)vis=vis.filter(r=>r.src===srcFilter);
+  if(topicFilter)vis=vis.filter(r=>gtopics(r.id).includes(topicFilter));
+
+  if(searchQ)vis=vis.filter(matchesSearch);
+  // Build the comparator for whatever sort mode is currently active
+  let cmp;
+  if(sortByTitle){
+    cmp=(a,b)=>a.title.localeCompare(b.title);
+  } else if(mainSortBy==='recent'){
+    // Sort by addedOn date (most recently added to directory first)
+    const parseAdded=s=>{
+      if(!s)return 0;
+      const d=new Date(s+' 2026');
+      return isNaN(d)?0:d.getTime();
+    };
+    const dir=sortDir==='desc'?-1:1;
+    cmp=(a,b)=>{
+      const aT=parseAdded(a.addedOn);
+      const bT=parseAdded(b.addedOn);
+      if(aT!==bT)return dir*(bT-aT);
+      return (a.readOrder||999)-(b.readOrder||999);
+    };
+  } else if(mainSortBy==='number'){
+    const dir=sortDir==='desc'?-1:1;
+    cmp=(a,b)=>dir*(a.id-b.id);
+  } else if(cf==='done'){
+    cmp=(a,b)=>(gs(b.id,'doneAt',0)||0)-(gs(a.id,'doneAt',0)||0);
+  } else {
+    cmp=(a,b)=>(a.readOrder||999)-(b.readOrder||999);
+  }
+  // Queued articles always float to top (sorted among themselves by the
+  // active comparator), then the rest follow, also sorted by the same comparator.
+  if(cf==='done'){
+    vis=[...vis].sort(cmp);
+  } else {
+    const queued=vis.filter(r=>gs(r.id,'queued',false)).sort(cmp);
+    const rest=vis.filter(r=>!gs(r.id,'queued',false)).sort(cmp);
+    vis=[...queued,...rest];
+  }
+  updateQueueUI();
+
+  const cl=document.getElementById('cardList');
+  if(!vis.length){
+    cl.innerHTML=`<div class="empty"><span>◌</span>${searchQ?'No articles match your search — try title, topic, or #ID (e.g. #43).':'Nothing here yet.'}</div>`;
+  } else {
+    cl.innerHTML=vis.map(mkCard).join('');
+  }
+
+  const nu=RES.filter(r=>gnu(r.id));
+  const ns=document.getElementById('nuSec');
+  document.getElementById('nuLbl').textContent=`Not helpful (${nu.length})`;
+  ns.style.display=nu.length?'block':'none';
+  document.getElementById('nuList').innerHTML=nu.map(r=>`<div class="nuc"><div class="nur"><span class="nutl"><span style="color:var(--text-muted);font-size:11px;margin-right:5px;">#${r.id}</span>${r.title}</span><button class="rbtn" onclick="restoreCard(${r.id})"><span>↩</span> Restore</button></div></div>`).join('');
+}
+
+
+// ── INSIGHTS ─────────────────────────────────────────────────────────────────
+let insightsOpen=false;
+let ivTopicFilter='';
+
+function toggleInsightsView(){
+  insightsOpen=!insightsOpen;
+  const iv=document.getElementById('insightsView');
+  const cl=document.getElementById('cardList');
+  const nu=document.getElementById('nuSec');
+  const bb=document.getElementById('backupBanner');
+  const btn=document.getElementById('insightsToggleBtn');
+  if(insightsOpen){
+    document.getElementById('mainControls').style.display='none';
+    if(iv)iv.classList.add('open');
+    if(cl)cl.style.display='none';
+    if(nu)nu.style.display='none';
+    if(bb&&bb.style.display!=='none')bb.style.display='none';
+    renderInsightsView();
+  } else {
+    document.getElementById('mainControls').style.display='';
+    if(iv)iv.classList.remove('open');
+    if(cl)cl.style.display='';
+    render();
+  }
+}
+
+function renderInsightsView(){
+  const doneArticles=RES.filter(r=>!gnu(r.id)&&gst(r.id)==='done');
+  const meta=document.getElementById('ivMeta');
+  if(meta)meta.textContent=doneArticles.length+' done article'+(doneArticles.length!==1?'s':'');
+
+  // Build topic filter from done articles
+  const allTags=new Set();
+  doneArticles.forEach(r=>(r.tags||[]).forEach(t=>allTags.add(t)));
+  const ivFilters=document.getElementById('ivFilters');
+  if(ivFilters){
+    const tags=[...allTags].sort();
+    if(!tags.length){ivFilters.innerHTML='';} else {
+      const lbl=ivTopicFilter||'All topics';
+      const items=tags.map(t=>{const esc=t.replace(/"/g,'&quot;');const sel=ivTopicFilter===t?' sel':'';return '<div class="ex-fdd-item'+sel+'" onclick="setIvTopic(&quot;'+esc+'&quot;)">'+t+'</div>';}).join('');
+      const clear='<div class="ex-fdd-clear"><div class="ex-fdd-item" onclick="setIvTopic(&quot;&quot;)" style="color:var(--text-muted);">✕ Clear</div></div>';
+      ivFilters.innerHTML='<span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;">Topic</span><div class="ex-fdd" id="ivTopicDd"><button class="ex-fdd-btn '+(ivTopicFilter?'active':'')+'" onclick="toggleIvDd()"><span id="ivTopicLbl">'+lbl+'</span><span class="ex-dd-arrow">▾</span></button><div class="ex-fdd-menu" id="ivTopicMenu">'+items+clear+'</div></div>';
+    }
+  }
+
+  // Filter articles
+  const filtered=ivTopicFilter
+    ? doneArticles.filter(r=>(r.tags||[]).includes(ivTopicFilter))
+    : doneArticles;
+
+  const ivCards=document.getElementById('ivCards');
+  if(!ivCards)return;
+
+  if(!doneArticles.length){
+    ivCards.innerHTML='<div class="iv-empty">No articles marked done yet.<br>Mark articles done to generate insights.</div>';
+    return;
+  }
+  if(!filtered.length){
+    ivCards.innerHTML='<div class="iv-empty">No done articles match this topic filter.</div>';
+    return;
+  }
+
+  ivCards.innerHTML=filtered.map(r=>mkInsightCard(r)).join('');
+}
+
+function setIvTopic(t){
+  ivTopicFilter=t;
+  renderInsightsView();
+}
+
+function mkInsightCard(r){
+  const insights=gs(r.id,'insights',null);
+  const notes=gn(r.id);
+  const sm=gsm(r.id);
+  const hasCP=!!r.cc;
+  const cpOpen=!!op['icp_'+r.id];
+  const tags=(r.tags||[]).map(t=>`<span class="topic-chip ${chipColor(t)}" style="cursor:default;"># ${toTitleCase(t)}</span>`).join('');
+
+  let insightBody='';
+  if(insights&&insights.length){
+    insightBody=`<div class="insight-list">${[...insights].reverse().map(i=>`
+      <div class="insight-item">
+        <div class="insight-bullet"></div>
+        <div class="insight-body">
+          <div class="insight-title">${i.title}</div>
+          <div class="insight-desc">${i.desc}</div>
+        </div>
+      </div>`).join('')}</div>`;
+  } else {
+    // Placeholder — will be generated
+    insightBody=`<div class="ic-placeholder" id="iph-${r.id}">
+      <span class="ic-generating"><span class="ld"><span></span><span></span><span></span></span> Generating insights…</span>
+    </div>`;
+    // Auto-trigger generation
+    setTimeout(()=>generateInsights(r.id),100);
+  }
+
+  return `<div class="ic minimized" id="ic-${r.id}">
+  <div class="ic-top" onclick="toggleICMin(${r.id})">
+    <div>
+      <div style="display:flex;align-items:baseline;gap:8px;">
+        <div class="ic-title">#${r.id} ${r.title}</div>
+        ${gs(r.id,'insightsDate',null)?`<span class="ic-date">${gs(r.id,'insightsDate','')}</span>`:''}
+      </div>
+
+    </div>
+    <div class="ic-actions" onclick="event.stopPropagation()">
+      <a href="${r.url}" target="_blank" rel="noopener" class="ic-btn" title="Read full article">↗</a>
+      ${hasCP?`<button class="ic-btn ${cpOpen?'active':''}" id="icp-b-${r.id}" onclick="toggleICP(${r.id})" title="Compact view">▤</button>`:''}
+      <button class="ic-btn" onclick="regenInsights(${r.id})" title="Regenerate insights">↺</button>
+      <span class="ic-min-btn">▾</span>
+    </div>
+  </div>
+  <div class="ic-divider" style="display:none;"></div>
+  <div id="iins-${r.id}" style="display:none;">${insightBody}</div>
+  ${hasCP?`<div class="cpanel ${cpOpen?'open':''}" id="icp-p-${r.id}">${r.cc}</div>`:''}
+</div>`;
+}
+
+function toggleICMin(id){
+  const card=document.getElementById('ic-'+id);
+  if(!card)return;
+  card.classList.toggle('minimized');
+  // Hide/show insight body and divider manually for dynamic ids
+  const body=document.getElementById('iins-'+id);
+  const divider=card.querySelector('.ic-divider');
+  const cpanel=document.getElementById('icp-p-'+id);
+  const isMin=card.classList.contains('minimized');
+  if(body)body.style.display=isMin?'none':'';
+  if(divider)divider.style.display=isMin?'none':'';
+  if(cpanel)cpanel.style.display=isMin?'none':'';
+}
+function toggleICP(id){
+  const key='icp_'+id;op[key]=!op[key];
+  const el=document.getElementById('icp-p-'+id);
+  if(el)el.classList.toggle('open',!!op[key]);
+  const btn=document.getElementById('icp-b-'+id);
+  if(btn)btn.classList.toggle('active',!!op[key]);
+}
+
+async function generateInsights(id){
+  const r=RES.find(x=>x.id===id);if(!r)return;
+  const notes=gn(id);
+  const sm=gsm(id);
+  const prompt=`You are helping an AI PM candidate prepare for interviews at Indian tech companies.
+
+Article: "${r.title}"
+Key takeaway: "${r.kt}"
+Interview question it answers: "${r.iq}"
+${notes?'Their notes: "'+notes+'"':''}
+${sm?'AI review summary: "'+sm.interview_answer+'"':''}
+
+Generate 3-5 practical insights from this article. Each insight should:
+- Have a short title (4-6 words max)
+- Have 2-3 lines of plain explanation — no jargon, easy to revise before an interview
+- Be grounded in what an AI PM would actually say in an interview
+
+Respond ONLY in JSON, no markdown, no backticks:
+{"insights":[{"title":"...","desc":"..."}]}`;
+
+  const el=document.getElementById('iins-'+id);
+  if(!el)return;
+  el.innerHTML=`<div class="ic-generating"><span class="ld"><span></span><span></span><span></span></span> Generating insights…</div>`;
+
+  try{
+    const data=await callClaudeWithRetry(prompt,1000);
+    const raw=data.content.map(i=>i.text||'').join('');
+    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const insightDate=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    set(id,'insights',parsed.insights);
+    set(id,'insightsDate',insightDate);
+    el.innerHTML=`<div class="insight-list">${[...parsed.insights].reverse().map(i=>`
+      <div class="insight-item">
+        <div class="insight-bullet"></div>
+        <div class="insight-body">
+          <div class="insight-title">${i.title}</div>
+          <div class="insight-desc">${i.desc}</div>
+        </div>
+      </div>`).join('')}</div>`;
+  }catch(e){
+    console.error('generateInsights failed:',e);
+    const overloaded=/overload/i.test(e&&e.message||'');
+    const msg=overloaded?'Claude\'s servers are busy right now.':(e&&e.message?' ('+e.message+')':'');
+    el.innerHTML=`<div class="ic-placeholder" style="color:var(--rose);">Could not generate insights. ${msg} <button class="iv-fb" onclick="generateInsights(${id})">Try again</button></div>`;
+  }
+}
+
+function regenInsights(id){
+  set(id,'insights',null);
+  generateInsights(id);
+}
+
+// Insights auto-generate when insights view is opened
+
+// ── EXAMPLES ─────────────────────────────────────────────────────────────────
+let examplesOpen=false;
+let exCompanyF='';
+let exTopicF='';
+let exSortBy='company'; // 'company' | 'recent' | 'number'
+let exSortDir='asc'; // 'asc' | 'desc' — applies to recent/number sorts
+let exCf='to-read'; // 'all' | 'to-read' | 'done' | 'imp'
+let currentExSlug=null; // slug of currently open modal
+
+// State helpers — example flags live in state under slug keys
+// e.g. state['exImp_netflix-recommendations'] = true
+function getExState(slug,key,def){
+  const k='ex'+key+'_'+slug;
+  return (state[k]!==undefined)?state[k]:def;
+}
+function setExState(slug,key,val){
+  const k='ex'+key+'_'+slug;
+  state[k]=val;
+  ss(state);
+}
+
+function toggleExamplesView(){
+  examplesOpen=!examplesOpen;
+  const ev=document.getElementById('examplesView');
+  const cl=document.getElementById('cardList');
+  const nu=document.getElementById('nuSec');
+  const iv=document.getElementById('insightsView');
+  const btn=document.getElementById('examplesToggleBtn');
+  if(examplesOpen){
+    document.getElementById('mainControls').style.display='none';
+    if(ev)ev.classList.add('open');
+    if(cl)cl.style.display='none';
+    if(nu)nu.style.display='none';
+    if(iv)iv.classList.remove('open');
+    if(btn)btn.style.color='var(--sage)';
+    insightsOpen=false;
+    document.getElementById('insightsToggleBtn').style.color='#f43f5e';
+    renderExamplesView();
+  } else {
+    document.getElementById('mainControls').style.display='';
+    if(ev)ev.classList.remove('open');
+    if(cl)cl.style.display='';
+    if(btn)btn.style.color='#f43f5e';
+    render();
+  }
+}
+
+// EX_DB — hardcoded example objects
 ;
 
 // ── Filter + sort ─────────────────────────────────────────────────────────────
@@ -1142,7 +2223,7 @@ function openExModal(slug){
 let _cmCurrentId=null;
 
 function getFilteredCompacts(){
-  let vis=ARTICLES_DATA.filter(r=>!gnu(r.id)&&!!r.cc);
+  let vis=RES.filter(r=>!gnu(r.id)&&!!r.cc);
   if(!searchQ){
     if(cf==='to-read')vis=vis.filter(r=>gst(r.id)==='to-read');
     else if(cf==='done')vis=vis.filter(r=>gst(r.id)==='done');
