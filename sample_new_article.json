@@ -1,0 +1,17 @@
+{
+  "type": "article",
+  "id": 115,
+  "readOrder": 107,
+  "stage": "Tier 2 · Should Know",
+  "title": "How to Evaluate RAG Systems",
+  "url": "https://example.com/rag-evals",
+  "src": "eugeneyan",
+  "p": "essential",
+  "tags": ["RAG", "Evals", "AI Engineering"],
+  "addedOn": "27 Jun 2026",
+  "iq": "How would you measure whether your RAG system is working? / What metrics would you use to evaluate a retrieval-augmented chatbot?",
+  "kt": "RAG evals split into retrieval quality (Precision@K, Recall@K, MRR) and generation quality (faithfulness, answer relevance). Faithfulness = does the answer stay grounded in retrieved docs. Relevance = does the answer address the actual question. Both must be high — high faithfulness + low relevance means grounded but off-topic.",
+  "cc": "<div class=\"sec\"><div class=\"sh\">Why RAG evals are different</div><p>Standard ML evals measure prediction accuracy. RAG evals measure two things independently: did you retrieve the right chunks, and did you generate a faithful answer from them. A system can fail at either step.</p></div>",
+  "ccDate": "2026-06-27",
+  "mcq": []
+}
