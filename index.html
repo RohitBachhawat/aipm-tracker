@@ -882,6 +882,175 @@ const RES = ARTICLES_DATA;
 // empty storage bucket and makes all existing saved data invisible.
 // This key must stay 'aipm_v7' across every future rebuild of this file.
 const DK='aipm_v7';
+
+// ── GitHub Sync Layer ──────────────────────────────────────────────────────
+// Replaces window.storage with GitHub-backed persistence.
+// State is stored in state.json in your repo — syncs across all devices.
+
+const GITHUB_REPO = 'RohitBachhawat/aipm-tracker';
+const STATE_FILE  = 'state.json';
+const BRANCH      = 'main';
+
+let _ghToken = sessionStorage.getItem('aipm_gh_token') || '';
+let _stateSha = null;       // GitHub SHA of state.json — needed for updates
+let _saveQueue = null;      // pending debounced save
+let _tokenModalShown = false;
+
+function _ghHeaders(){
+  return {
+    'Authorization': 'Bearer ' + _ghToken,
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
+}
+
+async function _ghGetFile(path){
+  const res = await fetch(
+    `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}?ref=${BRANCH}&_=${Date.now()}`,
+    { headers: _ghHeaders() }
+  );
+  if(res.status === 404) return null;
+  if(!res.ok) throw new Error('GitHub fetch failed: ' + res.status);
+  const data = await res.json();
+  _stateSha = data.sha;
+  return JSON.parse(atob(data.content.replace(/\n/g,'')));
+}
+
+async function _ghPutFile(path, content){
+  const body = {
+    message: 'sync: update ' + path,
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+    branch: BRANCH
+  };
+  if(_stateSha) body.sha = _stateSha;
+  const res = await fetch(
+    `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,
+    { method: 'PUT', headers: _ghHeaders(), body: JSON.stringify(body) }
+  );
+  if(!res.ok){
+    const err = await res.json();
+    throw new Error('GitHub write failed: ' + (err.message||res.status));
+  }
+  const data = await res.json();
+  _stateSha = data.content.sha;
+}
+
+function _showTokenModal(onSuccess){
+  if(_tokenModalShown) return;
+  _tokenModalShown = true;
+  const overlay = document.createElement('div');
+  overlay.id = 'ghTokenModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem;font-family:\'DM Sans\',sans-serif;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border-radius:14px;padding:1.75rem;max-width:480px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25);">
+      <div style="font-size:1.05rem;font-weight:600;color:var(--text-primary);margin-bottom:.4rem;">Connect to GitHub</div>
+      <p style="font-size:13.5px;color:var(--text-secondary);margin-bottom:1rem;line-height:1.6;">
+        Paste your GitHub token to sync your progress across all devices.
+        Your token stays in this browser session only — never sent anywhere except GitHub.
+      </p>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.75rem;">
+        Get one at: github.com → Settings → Developer settings → Fine-grained tokens → <strong>RohitBachhawat/aipm-tracker</strong> → Contents: Read &amp; Write
+      </p>
+      <input id="ghTokenInput" type="password" placeholder="github_pat_..." 
+        style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--surface2);color:var(--text-primary);outline:none;box-sizing:border-box;margin-bottom:.75rem;" />
+      <div id="ghTokenError" style="font-size:12.5px;color:#e55;margin-bottom:.5rem;display:none;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="ghTokenSkip" style="background:none;border:1px solid var(--border);border-radius:999px;padding:6px 18px;font-size:13.5px;color:var(--text-secondary);cursor:pointer;">Skip (local only)</button>
+        <button id="ghTokenSave" style="background:var(--text-primary);border:none;border-radius:999px;padding:6px 20px;font-size:13.5px;color:var(--surface);cursor:pointer;font-weight:500;">Connect</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const input = document.getElementById('ghTokenInput');
+  const errEl = document.getElementById('ghTokenError');
+  const saveBtn = document.getElementById('ghTokenSave');
+  const skipBtn = document.getElementById('ghTokenSkip');
+
+  input.focus();
+
+  async function tryConnect(){
+    const tok = input.value.trim();
+    if(!tok){ errEl.textContent='Please paste your token.'; errEl.style.display='block'; return; }
+    saveBtn.textContent = 'Connecting...'; saveBtn.disabled = true;
+    errEl.style.display = 'none';
+    try{
+      // Test token by fetching repo
+      const test = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, { headers: { 'Authorization':'Bearer '+tok, 'Accept':'application/vnd.github+json' }});
+      if(!test.ok) throw new Error('Invalid token or no repo access');
+      _ghToken = tok;
+      sessionStorage.setItem('aipm_gh_token', tok);
+      overlay.remove();
+      _tokenModalShown = false;
+      showToast('✓ Connected to GitHub — syncing your progress');
+      await onSuccess();
+    }catch(e){
+      errEl.textContent = e.message || 'Could not connect. Check your token.';
+      errEl.style.display = 'block';
+      saveBtn.textContent = 'Connect'; saveBtn.disabled = false;
+    }
+  }
+
+  saveBtn.addEventListener('click', tryConnect);
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') tryConnect(); });
+  skipBtn.addEventListener('click', ()=>{
+    overlay.remove();
+    _tokenModalShown = false;
+    showToast('Running in local-only mode — progress won\'t sync across devices');
+    // Fall back to localStorage
+    _useLocalFallback = true;
+    onSuccess();
+  });
+}
+
+let _useLocalFallback = false;
+
+// Drop-in replacement for window.storage
+window.storage = {
+  get: async function(key){
+    if(_useLocalFallback){
+      const v = localStorage.getItem(key);
+      return v ? {key, value: v} : null;
+    }
+    if(!_ghToken){
+      // Token not set yet — return null for now, modal will fire in initState
+      return null;
+    }
+    try{
+      const data = await _ghGetFile(STATE_FILE);
+      if(!data || !data[key]) return null;
+      return { key, value: JSON.stringify(data[key]) };
+    }catch(e){
+      console.warn('GitHub read failed, using localStorage:', e);
+      const v = localStorage.getItem(key);
+      return v ? {key, value: v} : null;
+    }
+  },
+
+  set: async function(key, value){
+    if(_useLocalFallback){
+      localStorage.setItem(key, value);
+      return;
+    }
+    if(!_ghToken) return; // no token, skip
+    // Debounce — only write after 2s of no changes
+    clearTimeout(_saveQueue);
+    _saveQueue = setTimeout(async()=>{
+      try{
+        // Read current file first to get fresh SHA and merge
+        let current = {};
+        try{ current = await _ghGetFile(STATE_FILE) || {}; }catch(e){}
+        current[key] = JSON.parse(value);
+        await _ghPutFile(STATE_FILE, current);
+      }catch(e){
+        console.warn('GitHub write failed, saving to localStorage:', e);
+        localStorage.setItem(key, value);
+      }
+    }, 2000);
+  }
+};
+// ── End GitHub Sync Layer ──────────────────────────────────────────────────
+
 let sortByTitle=false;
 let searchQ='';
 let mainSortBy='default'; // 'default' | 'recent' | 'topic' | 'number'
@@ -934,15 +1103,22 @@ let state={},cf='to-read',srcFilter='',topicFilter='',op={};
 let _saveTimer=null;
 
 async function initState(){
+  // If no token in session, show modal first, then load
+  if(!_ghToken && !_useLocalFallback){
+    _showTokenModal(async ()=>{
+      await _doLoadState();
+    });
+    return;
+  }
+  await _doLoadState();
+}
+
+async function _doLoadState(){
   try{
     const r=await window.storage.get(DK);
     state=r?JSON.parse(r.value):{};
   }catch(e){state={};}
-  // Show backup banner if user has saved data
-  if(Object.keys(state).length>0){
-    const b=document.getElementById('backupBanner');
-    if(b)b.style.display='flex';
-  }
+  // Backup banner hidden — state now syncs to GitHub automatically
   cf='to-read';
   // Backfill insightsDate for articles that have insights but no date yet
   const today=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'});
