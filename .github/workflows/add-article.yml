@@ -1,0 +1,30 @@
+name: Add Article
+
+on:
+  push:
+    paths:
+      - 'inbox/new_article.json'
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Merge new_article.json into articles.js
+        run: python3 .github/scripts/merge_article.py
+
+      - name: Delete inbox file after merge
+        run: rm inbox/new_article.json
+
+      - name: Commit updated articles.js
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/articles.js
+          git rm inbox/new_article.json
+          git commit -m "auto: add article from inbox"
+          git push
