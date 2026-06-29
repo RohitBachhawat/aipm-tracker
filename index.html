@@ -949,9 +949,7 @@ function _showTokenModal(onSuccess){
         Paste your GitHub token to sync your progress across all devices.
         Your token stays in this browser session only — never sent anywhere except GitHub.
       </p>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.75rem;">
-        Get one at: github.com → Settings → Developer settings → Fine-grained tokens → <strong>RohitBachhawat/aipm-tracker</strong> → Contents: Read &amp; Write
-      </p>
+
       <input id="ghTokenInput" type="password" placeholder="github_pat_..." 
         style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--surface2);color:var(--text-primary);outline:none;box-sizing:border-box;margin-bottom:.75rem;" />
       <div id="ghTokenError" style="font-size:12.5px;color:#e55;margin-bottom:.5rem;display:none;"></div>
@@ -2707,7 +2705,7 @@ function toggleDarkMode(){
 function initDarkMode(){
   const saved=localStorage.getItem('aipm_darkMode');
   const prefersDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDark=saved!==null?saved==='1':prefersDark;
+  const isDark=saved!==null?saved==='1':false;
   if(isDark)document.body.classList.add('dark');
   const btn=document.getElementById('darkModeBtn');
   if(btn)btn.textContent=isDark?'☀️':'🌙';
