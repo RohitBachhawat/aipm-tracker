@@ -1,3 +1,601 @@
 {
-  "aipm_v7": {}
+  "aipm_v7": {
+    "1": {
+      "status": "done",
+      "notes": "For a single job we can use multiple models depending on how easy or hard the task is\nFor easy work like searching the DB and basic reasoning, choose a cheap model\nFor medium complexity like refund, missing item choose medium model like claude sonnet, gemini 3 etc\nFor complex reasoning choose opus, gemini pro, etc This is important because you don't want to pay high cost for simple, straight forward problems. For simple tasks, stick with cheap model and for complex, choose best models. How to do it: Divide tasks into categories and figure out what % of categories or problems can be handled with cheap mode. May be some fine tuning is required like in case of refund. Then calculate the cost you have to incur and compare with human to understand which one will give better results. How to measure? Record telemetry data regularly - token used, input token, output token, latency, user response - satisfied/ not satisfied, escalated, etc. Based on this understand how to tweak your system so that you always give accurate, high confidence answer with least latency.\nThis is a brief summary of my understand about the blog. Rate it in terms of %. What am I missing? ",
+      "summary": {
+        "score": 72,
+        "gaps": [
+          {
+            "what_was_missing": "No mention of the routing layer as an explicit architectural component",
+            "correct_answer": "The routing layer is not just a conceptual grouping — it is a dedicated classifier or rules engine that sits in front of your models and routes each incoming query to the right model tier in real time. In an interview, naming it as an architectural decision (and explaining how it decides) signals real system thinking."
+          },
+          {
+            "what_was_missing": "The five evaluation constraints from the article were not captured — only cost and latency were implied",
+            "correct_answer": "The article scores every model on five dimensions: Task Fit (does the model's capability match the problem type?), Latency (is the response fast enough for the UX?), Cost (token cost at scale), Context Window (can it hold enough conversation history or document length?), and Controllability (how reliably can you constrain its output format and tone?). Missing context window and controllability in an interview answer leaves your framework incomplete."
+          },
+          {
+            "what_was_missing": "Fine-tuning was mentioned casually without explaining when and why it replaces model-tier selection",
+            "correct_answer": "Fine-tuning a smaller model on domain-specific data (e.g. Swiggy refund policies) can make a cheap model match a frontier model's accuracy on that narrow task, at a fraction of the cost — this is a deliberate cost-optimization strategy, not just an afterthought, and interviewers expect you to state the trade-off explicitly."
+          },
+          {
+            "what_was_missing": "No mention of fallback logic or escalation paths between model tiers",
+            "correct_answer": "A production routing system needs a fallback: if the cheap model returns a low-confidence score or the user escalates, the system should automatically retry with the next model tier or hand off to a human agent. Describing this loop shows you understand reliability and graceful degradation, which is critical for customer-facing AI at scale."
+          }
+        ],
+        "interview_answer": "So the core insight here is that you should never use a single model for everything — instead you build a routing layer that matches each query to the right model tier based on complexity. Let me walk through how I'd design this for, say, Swiggy's customer support agent. First I'd categorize incoming queries. Roughly 60 to 70 percent are simple — order status, delivery ETAs, basic FAQs. These go to a cheap, fast model. Another 20 to 25 percent are medium complexity — refund requests, missing items — where I might use a fine-tuned mid-tier model like Sonnet, because fine-tuning on Swiggy's refund policies can get me frontier-level accuracy at a fraction of the cost. The remaining 5 to 10 percent are genuinely complex — fraud disputes, multi-order issues — and only those go to a frontier model like Opus or Gemini Pro. When I'm evaluating which model goes in which tier, I score each one on five dimensions: task fit, latency, cost, context window, and controllability — because you need the model to follow strict output formats in a support flow. I also build in a fallback: if the cheap model returns low confidence, it automatically escalates to the next tier, and if that fails, it routes to a human agent. To measure success I track token usage, latency, satisfaction rate, and escalation rate as ongoing telemetry, so I can continuously rebalance the routing thresholds. The goal is the highest accuracy at the lowest cost, with no dead ends for the customer."
+      },
+      "insights": [
+        {
+          "title": "Never use one model",
+          "desc": "Routing every query to the same model wastes money on simple tasks and under-serves complex ones. A good AI PM designs tiers so the model matches the job, not the other way around."
+        },
+        {
+          "title": "Complexity decides the tier",
+          "desc": "Roughly 60-70% of support queries are simple enough for a cheap model. Only the hardest 5-10% need a frontier model. Knowing your query mix is the first step before picking any model."
+        },
+        {
+          "title": "Fine-tuning beats upgrading",
+          "desc": "For medium-complexity tasks like refunds, fine-tuning a mid-tier model on your own data often matches frontier accuracy at a fraction of the cost. It is cheaper to teach a smaller model your rules than to pay for a bigger one."
+        },
+        {
+          "title": "Build confidence-based fallbacks",
+          "desc": "No routing layer is perfect, so you add a safety net: if the cheap model returns a low-confidence answer, it automatically escalates to the next tier, and then to a human if needed. This prevents dead ends without inflating costs."
+        },
+        {
+          "title": "Telemetry drives continuous improvement",
+          "desc": "Track token usage, latency, satisfaction rate, and escalation rate after launch. These signals tell you when a routing threshold is too aggressive or too loose, so you can rebalance without guessing."
+        }
+      ],
+      "insightsDate": "18 May"
+    },
+    "2": {
+      "status": "done",
+      "insights": [
+        {
+          "title": "AI products are pipelines, not models",
+          "desc": "No single AI model does everything. A feature like wardrobe sorting uses one model to detect clothing, another to classify it, and another to group outfits. As a PM, you need to understand how these steps connect and where failures happen."
+        },
+        {
+          "title": "PMs set thresholds, not algorithms",
+          "desc": "Your job is not to build the ML model but to decide how confident the model needs to be before it shows a result to the user. Setting that confidence threshold is a product decision, not an engineering one, and interviewers want to hear you own it."
+        },
+        {
+          "title": "Measure return visits, not first opens",
+          "desc": "A feature being opened once means nothing. The real signal is whether users come back to use it again. For AI features especially, success means the output was good enough that the user trusted it and returned, so design your metrics around repeat engagement."
+        },
+        {
+          "title": "Define failure modes early",
+          "desc": "AI features fail in specific, predictable ways like wrong predictions or low confidence results. A strong PM anticipates these failures upfront and decides what the product should do in each case, such as hiding a result versus showing it with a warning."
+        },
+        {
+          "title": "User trust is a metric too",
+          "desc": "For AI products, how much a user relies on the output matters as much as accuracy. If users always override or ignore suggestions, the feature has low trust even if the model is technically correct. Track correction rate or override rate as a proxy for trust."
+        }
+      ],
+      "insightsDate": "18 May"
+    },
+    "3": {
+      "notUseful": true,
+      "lastRead": "17 Jun"
+    },
+    "4": {
+      "topics": [
+        "tets"
+      ]
+    },
+    "7": {
+      "lastRead": "19 Jun",
+      "notes": "There are two parts to answering\n1. Retrieval - Are right documents retrieved by the machine? This is measured by Precision@K and Recall@K\n2. Generation - After getting the right docs, is the model generating right answer. This is measured from NLI\n\nQuality ceiling is retrieval, not generation.\n\nDefinition of metrics:\n\nRecall@K = relevant retrieved/ total relevant docs in the DB\nPrecision@K = relevant retrieved/ total relevant docs retrieved (might contain non retrieved)\nMRR = Measures the position where the first retrieved doc was shown. It is calculated on all the retrieval merged. So, if one message has relevant doc at position 3 out of 5 then it becomes 3/5, target is to get to 1st position\n\nThere is always a tradeoff between precision and recall. Higher precision will lead to lower recall and vice versa. Based on the criticality of situation you take the call. In case of financial situation, ensure that precision is higher. In case of detecting cancer, recall is important as missing one case will lead to death of a patient. There will be higher false positives but it is better than marking a positive case as negative. \n\ngeneration metrics:\nFaithfulness - Out of the generated response, what % is of it stick with the retrieved doc, how faithful is the answer to retrieved doc. If retrieval is bad, then response will be bad but faithfulness will be high\nAnswer relevance - Is the answer relevant to the question asked? If it might happen that faithfulness is high, but answer relevance is wrong because retriever didn't do their job properly\nhallucination rate - Out of the response share, what % of it was hallucinated\nGroundedness - % of claims with citation. Critical for medical, legal, compliance and financial responses\n\nOther things to look for:\n1. Latency\n2. Cost\n3. A/B test retrieval changes",
+      "veryImportant": true,
+      "status": "done",
+      "doneAt": 1780106251678,
+      "queued": false,
+      "summary": {
+        "score": 72,
+        "gaps": [
+          {
+            "what_was_missing": "MRR formula is wrong — they described it as a single query ratio (3/5) rather than the correct mean across all queries",
+            "correct_answer": "MRR is the mean of reciprocal ranks across all queries: if query 1 finds the relevant doc at position 2 (1/2) and query 2 finds it at position 1 (1/1), MRR = (0.5 + 1.0) / 2 = 0.75. The goal is to maximize this toward 1.0, not to get any single result to position 1."
+          },
+          {
+            "what_was_missing": "Precision@K definition has an error — 'total relevant docs retrieved (might contain non retrieved)' is confused phrasing; they mixed up the denominator",
+            "correct_answer": "Precision@K = relevant docs in top K results / K (the fixed cutoff number you chose). You retrieved K documents total; how many of those K are actually relevant? The denominator is always K, not 'total relevant in DB' which is Recall@K's denominator."
+          },
+          {
+            "what_was_missing": "The quality ceiling insight is stated but not explained — saying 'retrieval is the ceiling' without reasoning won't satisfy an interviewer",
+            "correct_answer": "Even a perfect generative model cannot produce a correct answer if the relevant document was never retrieved — generation can only work with what retrieval surfaces. So improving the generator beyond a point yields diminishing returns if retrieval precision or recall is low, making retrieval the true bottleneck to fix first."
+          },
+          {
+            "what_was_missing": "No mention of how to actually evaluate generation quality in practice — NLI is named but not grounded in what an AI PM would actually do with it",
+            "correct_answer": "In practice, AI PMs use frameworks like RAGAS which automate faithfulness and answer relevance scoring using an LLM-as-judge approach; you'd set threshold scores (e.g. faithfulness above 0.8) as a launch gate, run these on a golden eval dataset, and track them in your deployment monitoring dashboard alongside latency and cost."
+          }
+        ],
+        "interview_answer": "Great question. When I think about measuring AI feature quality, I break it into two layers — retrieval and generation — because the quality ceiling of any RAG system is retrieval, not generation. If the right documents are never surfaced, even the best model cannot save you. On the retrieval side, I look at three metrics. Precision at K tells me: of the K documents I retrieved, how many were actually relevant? Recall at K tells me: of all relevant documents that exist, how many did I actually find? There is always a tradeoff here, and context determines which I optimize for. For something like Swiggy's customer support bot handling refund disputes, I would prioritize precision — I want accurate, tight answers rather than surfacing every possibly-related policy. But for a medical use case, I would prioritize recall, because missing a relevant document could mean a wrong diagnosis. The third retrieval metric is MRR — Mean Reciprocal Rank — which measures how high up in the list the first relevant document appears, averaged across all queries. A higher MRR means users find the right answer faster. On the generation side, I track faithfulness — is the response grounded in what was retrieved — answer relevance, hallucination rate, and groundedness, which is especially critical for financial or legal features. Beyond quality, I always layer in latency and cost, and I validate any retrieval changes through A B testing before rolling them out."
+      }
+    },
+    "9": {
+      "veryImportant": true,
+      "status": "done",
+      "insights": [
+        {
+          "title": "LLMs predict, not understand",
+          "desc": "A large language model works by predicting the next word based on patterns learned from massive text data. It does not truly understand meaning — it statistically completes sequences. In an interview, say: 'LLMs are pattern-matching engines trained on text, not reasoning systems with intent.'"
+        },
+        {
+          "title": "RAG grounds AI in facts",
+          "desc": "Retrieval-Augmented Generation connects an LLM to a live knowledge source — like a product catalog or policy doc — so it answers from real data, not just training memory. This reduces hallucinations and keeps answers current. It is the go-to architecture when accuracy and freshness matter."
+        },
+        {
+          "title": "Fine-tuning shapes model behavior",
+          "desc": "Fine-tuning takes a general model and trains it further on your specific data, so it learns your tone, domain, or task. Think of it as the difference between a generic customer rep and one trained on your brand's style guide. Use this when RAG alone cannot capture the right behavior."
+        },
+        {
+          "title": "Embeddings make meaning searchable",
+          "desc": "Embeddings convert text into numbers that capture semantic meaning, so similar ideas land near each other mathematically. This powers search features like 'show me products similar to this' even when exact words do not match. As a PM, you can frame embeddings as the engine behind relevance and personalization."
+        },
+        {
+          "title": "Chain-of-thought improves complex outputs",
+          "desc": "Prompting a model to think step by step before answering — chain-of-thought — significantly improves performance on multi-step tasks like pricing logic or return policy decisions. It is a prompting technique, not a model change, so any PM can propose it without engineering lift. Mention it when asked how you would improve AI output quality quickly."
+        }
+      ],
+      "insightsDate": "18 May"
+    },
+    "10": {
+      "notes": "PM main job is orchestration, run agents who will various kinds of work for you. Taste is very important, research, writing code, sql, etc are mostly automated. Differentiation will be in domain knowledge and how well you can play with agent to get great outputs with right inputs. ",
+      "summary": {
+        "score": 62,
+        "gaps": [
+          {
+            "what_was_missing": "The candidate reduces 'taste' to domain knowledge and prompt engineering, missing what taste actually means. Taste is editorial judgment — the ability to decide what is worth building, what good looks like, and when to say no — and that is fundamentally a human, values-driven skill, not a technical one.",
+            "correct_answer": "Taste means knowing which 0.1% of possible outputs actually matter to users and the business. It is the PM's ability to hold a vision of quality and make judgment calls that no amount of data or prompting can fully resolve."
+          },
+          {
+            "what_was_missing": "The candidate frames the PM's future role as primarily 'orchestrating agents,' which sounds operational. This misses the more important shift: the PM's role moves upstream, toward problem selection, strategic framing, and outcome ownership — not just managing pipelines of AI tools.",
+            "correct_answer": "When AI handles execution, the scarce skill becomes choosing the right problem in the first place. The PM's job becomes less about running processes and more about deciding what is worth doing and why."
+          },
+          {
+            "what_was_missing": "The candidate lists research, writing, and SQL as 'mostly automated' without acknowledging the critical human step that still surrounds them: synthesizing ambiguous signals into a clear product direction. Generating a SQL output is not the same as knowing what question to ask or what the answer means for your roadmap.",
+            "correct_answer": "AI can run the query, but the PM must still define the question, interpret the result in business context, and make the judgment call — that interpretive layer is not automated."
+          },
+          {
+            "what_was_missing": "The 44% automatable stat is mentioned in the article but the candidate did not use it, and more importantly, did not name what the remaining 56% of PM work is — stakeholder alignment, ethical trade-offs, cross-functional trust, and setting north star goals. These are the durable, human parts of the role that an interviewer would want to hear called out explicitly.",
+            "correct_answer": "The non-automatable core of the PM role is building shared conviction across humans — aligning engineering, business, and design around a direction — because that requires navigating politics, emotions, and organizational context that AI cannot read or influence."
+          }
+        ],
+        "interview_answer": "The PM role is undergoing the biggest shift since agile. Studies suggest roughly 44 percent of PM work hours are already automatable — market research, writing PRDs, querying data, competitive analysis — AI does all of that faster and cheaper than any individual. So if a PM's identity is built around those skills, that is a real threat. But here is what I think actually happens: when execution becomes nearly free, the bottleneck moves upstream. The scarce resource becomes judgment — what the article calls taste. Taste is not domain knowledge or prompt engineering, though those help. Taste is the ability to look at a hundred possible things you could build and know which one actually matters. It is why two PMs given the same AI tools and the same data will ship completely different products. Take Swiggy Instamart — the insight that Indian households want 10-minute grocery delivery was not a data output; it was a judgment call about changing urban behavior, made before the data existed to confirm it. AI could not have made that call. So my view is the PM's role becomes less about doing and more about deciding — choosing the right problem, setting a clear north star, and then building alignment across engineering, design, and business around that direction. Orchestrating agents is part of it, yes, but the real job is having the taste to know when the agent's output is great and when it is just plausible-sounding nonsense."
+      },
+      "status": "done",
+      "insights": [
+        {
+          "title": "Execution is free now",
+          "desc": "AI can already do almost half of what PMs spend their time on — writing specs, pulling data, doing research. That means the value of being fast or thorough at those tasks is gone. What matters now is what you decide to do, not how well you execute it."
+        },
+        {
+          "title": "Taste beats skills",
+          "desc": "Two PMs with the same AI tools will build very different products. The difference is judgment — knowing which problem actually matters, which solution feels right, which output is genuinely good versus just convincing. That instinct is what AI cannot replicate."
+        },
+        {
+          "title": "Bottleneck moved upstream",
+          "desc": "When building gets cheap, the hard part becomes choosing what to build. The PM's job shifts from managing delivery to making the right call early — on the problem, the user, the bet. Get that wrong and all the AI-assisted execution is wasted."
+        },
+        {
+          "title": "Orchestration is not the whole job",
+          "desc": "Yes, PMs will run agents that write code, do analysis, draft documents. But orchestration is just the new execution. The real job is still knowing when the agent got it right and when it produced something that sounds good but is actually off."
+        },
+        {
+          "title": "Domain insight still wins",
+          "desc": "The Swiggy Instamart call — that Indian households would pay for 10-minute grocery delivery — was not a data output. It came from understanding how urban Indian life was changing before the numbers showed it. That kind of contextual human judgment is where PMs create real value."
+        }
+      ],
+      "insightsDate": "18 May"
+    },
+    "11": {
+      "status": "done",
+      "doneAt": 1779731679432,
+      "lastRead": "30 May",
+      "veryImportant": true
+    },
+    "12": {
+      "lastRead": "18 Jun",
+      "status": "done",
+      "doneAt": 1781770108624
+    },
+    "20": {
+      "notes": "Transformers - Understand more, keep longer context compared to previous method. Compared to past where model might not understand after 20 words, current models can easily understand more and hence give better result\nQKV\nQ - Query, what am I loooking for\nK - Key, what label do I have\nV - Value, What information do I hold\n\nQ*K - The model decides how much attention word A to pay to Word B\n\nPositional encoding - mathematical timestamp to understand which word comes first to derive right value,\nMetrics\n1. Token per second - How many? Higher the token, faster the output\n2. Context window - How many? More the context, better the understanding leading to better result. For long context, complex work, this becomes very important\n3. Hallucination rate - Lower the better\n4. Perplexity - Lower the better? If something new is shared, how model reacts",
+      "status": "done",
+      "insights": [
+        {
+          "title": "Context Window Is a PM Call",
+          "desc": "How much context a model can hold isn't just a technical limit — it's a product decision that affects cost, speed, and user experience. A PM should ask: does our use case need long context, or are we paying for capability we don't need?"
+        },
+        {
+          "title": "Attention Means Smarter Relevance",
+          "desc": "Older models forgot earlier words as they processed more text. Transformers let the model look at all words at once and decide which ones matter most for a given output. This is why modern LLMs can summarize a 50-page document without losing the plot."
+        },
+        {
+          "title": "QKV Is About Asking the Right Questions",
+          "desc": "Query, Key, and Value is how the model figures out what to focus on. Think of it like a search engine inside each sentence: the model asks a question, matches it to labels across the text, and pulls the most relevant information."
+        },
+        {
+          "title": "Metrics Signal Product Trade-offs",
+          "desc": "Tokens per second measures speed, context window measures depth, hallucination rate measures reliability, and perplexity measures how well the model handles new inputs. As a PM, knowing which metric to prioritize tells you what kind of product you're actually building."
+        },
+        {
+          "title": "Hallucination Is a Product Risk",
+          "desc": "When a model confidently says something wrong, that's a hallucination — and it's not just a model problem, it's a trust problem with your users. A good PM builds in guardrails, sets the right user expectations, and tracks this metric as seriously as any other quality signal."
+        }
+      ],
+      "insightsDate": "18 May",
+      "summary": {
+        "score": 62,
+        "gaps": [
+          {
+            "what_was_missing": "QKV mechanism explained only at a word level but the crucial insight — that attention is computed in parallel across ALL words simultaneously, not sequentially — was missing. This is the core reason transformers beat RNNs.",
+            "correct_answer": "The transformer computes Q, K, and V for every word at the same time, then scores all word-pair relationships in one matrix operation. This parallelism is why training is faster and why no context is 'forgotten' the way it was in RNNs."
+          },
+          {
+            "what_was_missing": "Perplexity was defined vaguely as 'how model reacts to new information,' which is imprecise and would raise eyebrows in an interview.",
+            "correct_answer": "Perplexity measures how confidently a model predicts the next token — lower perplexity means the model finds the text less surprising, indicating better language understanding. It is a benchmark metric used to compare base models, not a runtime or user-facing metric."
+          },
+          {
+            "what_was_missing": "The PM insight about context window being a product decision was entirely absent from the notes, even though it is the most important takeaway from this topic for a PM interview.",
+            "correct_answer": "Context window size directly affects cost, latency, and use-case fit — a 128K token window costs significantly more per call than an 8K one. As a PM you choose the right model tier based on the task: short queries like Swiggy search need small windows, while Flipkart's seller onboarding document analysis may need large ones."
+          },
+          {
+            "what_was_missing": "Hallucination rate was listed as a metric but with no explanation of why it happens or what a PM should do about it, which interviewers at Indian product companies often probe.",
+            "correct_answer": "Hallucinations occur because the model predicts the most statistically likely next token rather than retrieving ground truth — it is a probabilistic system, not a database. As a PM, you mitigate this through RAG (retrieval-augmented generation), grounding responses in real data, and adding human review checkpoints for high-stakes outputs like Zomato restaurant policy decisions."
+          }
+        ],
+        "interview_answer": "So, LLMs are built on an architecture called the Transformer, and the key innovation it introduced is called the attention mechanism. Before transformers, models like RNNs processed text word by word, and by the time they reached word 50, they had largely forgotten word 1. Transformers solved this by looking at all words simultaneously. Every word generates three things — a Query, a Key, and a Value. The Query is essentially the word asking 'who is relevant to me?', the Key is each word advertising what it is about, and the Value is the actual information it carries. The model multiplies Queries against Keys to produce attention scores, which determine how much each word should influence every other word. This happens in parallel across the entire input, which is why transformers are both fast and context-aware. Now, the size of that input — the context window — is where the PM thinking gets interesting. A larger context window, say 128,000 tokens, lets the model handle an entire legal contract or a long seller catalog on Meesho. But it also increases compute cost and latency significantly. So choosing the right context window for a feature is genuinely a product decision: you are trading off capability against cost and speed. For example, Swiggy's real-time dish recommendation query needs maybe 500 tokens, but an AI feature that summarizes a restaurant's entire review history might need 32,000. Getting that tradeoff right is what separates a good AI PM from someone who just delegates it to engineering."
+      }
+    },
+    "21": {
+      "lastRead": "29 May",
+      "notes": "MCP is a protocol that helps you connect to different data source using a single standard interface. Think of it similar to API used for connecting data between two companies. MCP is not exactly same, but similar. It lets you talk between your model and specific tool, data source, etc. ",
+      "status": "done",
+      "doneAt": 1780052962676
+    },
+    "22": {
+      "notes": "Evals are important to understand whether the results are really as expected or not. For every change in prompt, model, etc, we need to run eval. You need to create a list of test cases which is called Golden dataset.\n\nThe golden dataset will have 3 categories of test cases\n1. happy path - Simple, basic - must pass this. \n2. Numerical - If numerical like price less than 1000 or at least 1 kg of rice, for those numerical constraints we need to check if it is giving right answer or not. Most of them fail here\n3. Negative - If \"not\", \"no onion\" etc of query with negative text like don't include is written then it is supposed to honor it and share result after removing it\n\nA good LLM need to pass on all the 3\n\nThe other part is retrieval which is measured from recall@K. If out of 10 relevant docs in DB, if the retriever only pulls 7 then it recall is 7/10. If the info that LLM received is not of high quality and relevant then no matter how you change the model, prompt, the response won't be good. Hence, one need to understand where is the issue. \n\nEvals go in json format with 3 details - user query, expected retrieved information in IDs, expected output in IDs. Text make it subjective. ",
+      "status": "done",
+      "summary": {
+        "score": 62,
+        "gaps": [
+          {
+            "what_was_missing": "Why recall specifically matters over precision for AI evals — the notes just say 50% recall is bad without explaining the tradeoff",
+            "correct_answer": "Recall measures how many of the expected outputs your AI actually produced correctly. In most AI features, missing a correct answer (false negative) is worse than occasionally over-generating, so recall is the primary metric. Low recall means your model is silently failing on known-good cases."
+          },
+          {
+            "what_was_missing": "The golden dataset is not just a one-time baseline — it is a regression suite you run on every model or prompt change, which is the core reason PMs care about it",
+            "correct_answer": "The real value of a golden dataset is catching regressions: when you upgrade your LLM, change a prompt, or retune the model, you re-run the same dataset to confirm nothing broke. Without it, a prompt fix for one user could silently break ten others."
+          },
+          {
+            "what_was_missing": "Who defines the expected outputs in the golden dataset and how — the notes skip this step entirely",
+            "correct_answer": "Expected outputs are defined by domain experts or senior PMs before any AI runs — ideally with a rubric, not just a single correct answer, because LLM outputs are non-deterministic and a good answer can be phrased many ways. This human-defined ground truth is what makes the dataset golden."
+          },
+          {
+            "what_was_missing": "The notes mention a JSON file but miss why structured format matters for automated eval pipelines",
+            "correct_answer": "Storing the golden dataset as JSON or a structured file lets you plug it into automated CI-style pipelines so every code or model push triggers an eval run automatically, making quality gates scalable rather than relying on manual PM testing before each release."
+          }
+        ],
+        "interview_answer": "Great question. Evaluating an AI feature is fundamentally different from evaluating a deterministic feature, because you cannot manually test every possible input at scale. The first step is building what is called a golden dataset — typically 10 to 50 queries with human-defined expected outputs that represent the real distribution of how users will interact with the feature. For example, if I am building the AI search on Meesho, my golden dataset would have three categories. First, happy path queries like a straightforward search for a red kurti under 500 rupees. Second, negative constraint queries like I want a kurti, not polyester, not full sleeve — these are where most models fail early because they drop the NOT conditions. Third, complex reasoning queries, like find me the best value ethnic set for a wedding budget of 2000 rupees across multiple items. Once the dataset is ready, I run the AI against it and measure recall — meaning, of all the outputs the model should have produced, how many did it actually get right. Fifty percent recall means the model is silently failing half the time, which is unacceptable to ship. The most important habit as a PM is to treat this dataset as a regression suite, not a one-time check. Every time a prompt changes or the underlying model is upgraded, you re-run the golden dataset to catch any degradation before it reaches users. This turns AI quality from a gut feeling into a measurable, repeatable gate."
+      },
+      "insights": [
+        {
+          "title": "Golden dataset is your baseline",
+          "desc": "Before you can say your AI is working, you need a fixed set of test questions with known correct answers. This is called a golden dataset. Without it, you have no way to know if a model update made things better or worse."
+        },
+        {
+          "title": "Test beyond the happy path",
+          "desc": "Most teams only test cases where everything goes right. But you must also test negative constraints — where the user says NOT this — and complex reasoning queries like calculations or multi-step decisions. Models fail these more often than simple queries."
+        },
+        {
+          "title": "Recall tells you what you missed",
+          "desc": "The key metric for AI evals is recall — how many of the correct outputs did the model actually return. If recall is 50 percent, the model is silently failing half the time. That is never acceptable to ship."
+        },
+        {
+          "title": "Re-run evals every time you change anything",
+          "desc": "Whenever you update a prompt or upgrade the underlying model, you run the golden dataset again. This catches degradation before users see it. Think of it as a regression test, not a one-time check."
+        },
+        {
+          "title": "AI quality must be measurable",
+          "desc": "As a PM you cannot manually test every possible input at scale. The golden dataset turns AI quality from a gut feeling into a repeatable, measurable gate that the whole team can use before every release."
+        }
+      ],
+      "insightsDate": "20 May",
+      "lastRead": "19 Jun",
+      "queued": true
+    },
+    "23": {
+      "lastRead": "30 May",
+      "queued": true
+    },
+    "30": {
+      "queued": false,
+      "status": "done",
+      "insights": [
+        {
+          "title": "Evals replace vague requirements",
+          "desc": "Instead of writing a long PRD that describes what the AI should do in theory, a good PM writes evals — concrete test cases that show what good output looks like. This gives engineers and evaluators a shared, measurable definition of success."
+        },
+        {
+          "title": "Define quality before building",
+          "desc": "The best AI PMs write their eval set before a single line of model code is written. This forces you to think clearly about what the product must get right, and it prevents the team from shipping something that feels done but actually isn't."
+        },
+        {
+          "title": "Match eval type to product behavior",
+          "desc": "Single-turn evals test one input and one output, like a search result or a summary. Multi-turn evals check whether a chatbot stays helpful and consistent across a full conversation. Agent evals verify that an AI completed a real-world task correctly across many steps — each type fits a different product."
+        },
+        {
+          "title": "Evals make tradeoffs visible",
+          "desc": "When you have a defined eval set, you can see exactly where the model is improving and where it is regressing. This lets you have honest conversations with stakeholders about what you are optimizing for and what you are willing to sacrifice."
+        },
+        {
+          "title": "PM owns the eval, not just the roadmap",
+          "desc": "In AI products, the PM's job does not stop at writing features and timelines. Defining what counts as a good response — and making sure the team tests against that standard — is now a core PM responsibility, not something to leave to the data science team."
+        }
+      ],
+      "insightsDate": "24 May",
+      "lastRead": "18 Jun",
+      "notes": "Three types of evals\n1. Single turn - judges on single turn, didn't consider context, tools used, only judges on the basis of answer it received. \n2. Multi turn - Real life examples are different. People mention about a points in message 1, then 3, and then 7. Single turn doesn't take context like whether user asked this more than twice or not, hence multi turn becomes important\n3. Agent eval - This is where you doesn't restrict to tone, and the text only, but the logic. If the agent replied with a task done, is it actually done? If chatbot said I've searched and the response are visible up, is it actually checking search api' result and based on its response giving reply?\n\nLLM as judge - It is not possible to eval and control quality as the numbers keep increasing and hence, LLM as a judge can be used. Deploy two LLMs as judge because LLM have their own bias. \n\n1. Position Bias - Whichever was shown first will get higher rating. So, if there are two response and response A was shown first, then it will get higher score. Hence with 2 judges we can try response B first and then response A. \n2. Length bias - LLM give more weightage to lengthy response even if it not that good. Need to add a rubric not to exceed x words\n3. Agreeable bias - LLMs by default don't ask question, they treat the output as it is. Need to ask judge to ask for evidence before scoring\n4. Self-preference bias - ChatGPT will give higher response to chatGPT generated response and same for claude"
+    },
+    "32": {
+      "lastRead": "29 May"
+    },
+    "34": {
+      "queued": true
+    },
+    "35": {
+      "notes": "I understood very limited from this article. \n\nInstead of calling all the experts and running Billions of parameters, MOE helps with choosing 2-3 experts and limited parameters leading to lower cost and fast response. MOE is the architecture that helps in reducing cost, but at the same time giving similar performance to other models who are calling all the experts. \n\nHospital example was good, easy to understand. \n\nTradeoff:\n1. Memory intensive - All the parameters needs to be loaded even when limited are active\n2. FIne tuning is harder - model tries to overfit in small datasets\n3. Load balancing is hard - Limited experts are getting used all the time, idle ones loose efficiency and the limited experts gets overwhelmed ",
+      "status": "done",
+      "insights": [
+        {
+          "title": "Big model, selective thinking",
+          "desc": "MoE models don't use all their power for every question. They route each query to just 2-3 relevant expert subnetworks, which is why a massive model like GPT-4 can respond quickly without burning enormous compute on every single request."
+        },
+        {
+          "title": "Capability without full cost",
+          "desc": "Before MoE, bigger model meant higher cost, always. MoE breaks that tradeoff by keeping most parameters idle per query. As a PM, this is why you can offer frontier-level intelligence at an API price that actually fits a product budget."
+        },
+        {
+          "title": "Memory is the hidden constraint",
+          "desc": "Even though only a few experts activate per query, all experts must stay loaded in memory at all times. This means MoE shifts cost from compute to infrastructure, which matters when you are planning deployment architecture or negotiating cloud spend."
+        },
+        {
+          "title": "Load balancing affects reliability",
+          "desc": "If the routing mechanism keeps sending traffic to the same popular experts, those experts get overwhelmed while others sit idle. For a PM, this is a latency and reliability risk under peak load, not just an engineering footnote."
+        },
+        {
+          "title": "Fine-tuning needs more caution",
+          "desc": "MoE models are harder to fine-tune on small datasets because the model can overfit quickly. If your product roadmap includes custom fine-tuning on proprietary data, a dense model might be a safer and more predictable choice than an MoE architecture."
+        }
+      ],
+      "insightsDate": "18 May"
+    },
+    "38": {
+      "veryImportant": true,
+      "status": "done",
+      "insights": [
+        {
+          "title": "Start with operator judgment",
+          "desc": "Before building anything, a PM should ask what work AI could realistically help with. This keeps you grounded in actual user problems instead of chasing technology for its own sake."
+        },
+        {
+          "title": "Define good output early",
+          "desc": "You need to know what a correct AI response looks like before you ship, not after. If you cannot describe good output clearly, you cannot catch bad output either."
+        },
+        {
+          "title": "Give AI the right context",
+          "desc": "AI fails when it lacks the information a human expert would naturally have. A PM's job is to identify that missing context and make sure the system has it before it acts."
+        },
+        {
+          "title": "Match trust to risk level",
+          "desc": "The trust ladder — draft, recommend, prepare, act — tells you how much autonomy to give AI based on how bad a mistake could be. Start low on the ladder and move up only after you have evidence the system is reliable."
+        },
+        {
+          "title": "Keep humans in the loop deliberately",
+          "desc": "Deciding when a human must review AI output is a product decision, not an afterthought. A strong answer in any interview includes a clear rule for when the AI stops and a person takes over."
+        }
+      ],
+      "insightsDate": "18 May"
+    },
+    "39": {
+      "lastRead": "29 May"
+    },
+    "40": {
+      "status": "done",
+      "insights": [
+        {
+          "title": "AI raised the floor",
+          "desc": "AI tools can now handle basic PM work like writing requirements or drafting updates. This means average execution is no longer a differentiator. What matters now is the quality of thinking that happens before any execution begins."
+        },
+        {
+          "title": "Decisions are the new deliverable",
+          "desc": "In an AI-assisted world, the real PM output is a well-reasoned decision, not a document or a roadmap slide. PMs who can clearly explain why a call was made, and what tradeoffs were considered, will stand out. Decision documentation is a skill worth building deliberately."
+        },
+        {
+          "title": "Drop the status update habit",
+          "desc": "Coordinating meetings and writing progress updates can increasingly be handled by AI. PMs who spend most of their time on this kind of work are at risk of being sidelined. The shift is toward deeper work like discovery, prioritization, and strategic framing."
+        },
+        {
+          "title": "Prompt thinking is a core skill",
+          "desc": "Understanding how to work effectively with AI tools, what to ask, how to structure inputs, and how to evaluate outputs, is now a practical PM skill. It is not just a technical nice-to-have. PMs who treat AI as a thinking partner rather than a shortcut will make better decisions faster."
+        },
+        {
+          "title": "Systems thinking over task thinking",
+          "desc": "As individual tasks get automated, the PM's job becomes understanding how all the pieces interact, users, product, data, business model, and AI systems. Shallow feature thinking is not enough. The ability to zoom out and see second-order effects is what separates strong PMs in this era."
+        }
+      ],
+      "insightsDate": "18 May"
+    },
+    "42": {
+      "lastRead": "29 May"
+    },
+    "43": {
+      "queued": false,
+      "status": "done",
+      "doneAt": 1779719011369,
+      "lastRead": "26 May"
+    },
+    "44": {
+      "queued": false,
+      "status": "done",
+      "insights": [
+        {
+          "title": "Quantify the Pain First",
+          "desc": "Before pitching any AI project, confirm the problem causes real, measurable loss — lost revenue, hours wasted, customers churning. If you can't put a number on the pain, the project will never get prioritized or funded."
+        },
+        {
+          "title": "Fit Into Existing Workflows",
+          "desc": "AI projects fail when they ask users to change how they work. The strongest projects slot into something people already do every day, so adoption isn't a separate battle you have to fight."
+        },
+        {
+          "title": "One KPI, One Week",
+          "desc": "If you can't point to a single metric that tells you within a week whether the AI is working, the project lacks clarity. A weekly KPI forces the team to stay honest and catch problems early."
+        },
+        {
+          "title": "Proprietary Data Is the Moat",
+          "desc": "Anyone can call an API. What competitors can't copy is the data only your company has — from your users, your operations, your history. That's what makes an AI feature defensible long-term."
+        },
+        {
+          "title": "Score It Before You Sprint",
+          "desc": "Use a structured checklist across seven dimensions before committing engineering time. If a project scores below a threshold, say no early. This is how PMs avoid sunk cost and keep teams focused on bets that can actually ship."
+        }
+      ],
+      "insightsDate": "24 May"
+    },
+    "45": {
+      "status": "done",
+      "doneAt": 1779719399984
+    },
+    "48": {
+      "queued": false,
+      "notes": "Trust is very important, more important then compute, latency, etc. \n\nHow do you build trust?\n1. Predictability - Is the mode giving outputs based on inputs & customs instructions. Can I predict the output?\n2. Reversibility - If something goes wrong, can I reverse it?\n3. Build Commitment - Can it solves small tasks before giving them big tasks?\n\nDesign principles\n1. Make it visible - Perplexity citation for source of content, acts as evidence\n2. Reversibility - If I can reverse and improve it?\n3. Human explanation - Ignore the code, in simple terms what does it mean\n4. Safety - Give user the final control\n5. Consistent track record - Every time, system gives good answer, it builds trust",
+      "status": "done",
+      "insights": [
+        {
+          "title": "Trust beats raw capability",
+          "desc": "Users will abandon a capable AI if it feels unpredictable. A PM should prioritize making the system feel reliable over making it more powerful, because trust is what drives daily adoption."
+        },
+        {
+          "title": "Let users undo mistakes freely",
+          "desc": "When users know they can reverse an action, they experiment more and engage more deeply. Reversibility is not just a safety feature — it is a growth lever that reduces fear of trying new things."
+        },
+        {
+          "title": "Earn trust in small steps",
+          "desc": "An AI should solve narrow, low-stakes tasks well before being handed bigger responsibilities. As a PM, this means designing a staged rollout where the product proves itself before asking users for more trust."
+        },
+        {
+          "title": "Show your work visibly",
+          "desc": "Citing sources, showing reasoning steps, or displaying confidence levels makes AI behavior feel transparent. Users trust what they can inspect, so visibility is a design requirement, not a nice-to-have."
+        },
+        {
+          "title": "Consistency builds the track record",
+          "desc": "A single impressive output does not create trust — a pattern of reliable outputs does. PMs should track how often the system gets it right across different users and contexts, not just in demos."
+        }
+      ],
+      "insightsDate": "24 May"
+    },
+    "50": {
+      "lastRead": "29 May"
+    },
+    "51": {
+      "lastRead": "19 Jun",
+      "queued": true
+    },
+    "54": {
+      "queued": true
+    },
+    "56": {
+      "veryImportant": true,
+      "status": "done",
+      "doneAt": 1779719404515,
+      "queued": false,
+      "lastRead": "18 Jun",
+      "notes": "Evals are a set of check, questions to check the quality of answers an AI gives. It is a metric to understand how well is the model performing. After every small change, we should run eval checklist to find if it actually improved or degraded. Ideally every day or week a set of evals should run on production data and give a score, this way we can identify if the change actually worked or not. \n\nSPEC\n\nS - Scenario List of scenarios for which we should run. Refund, order mismatch, policy hallucination, search result, any normal query, outside the scope of doc, etc any issue where it can fail\nP - Predicate TRUE/FALSE. Either it pass or fail. After every prompt update, model change, any other change, run this eval and check the number \nE - Evidence Use real examples from logs, production data and check the eval on these list\nC - Cadence Run after every change in prompt or other change + daily in prod. If pass rate drops, then stop and fix before launching\n\nExamples\n1. Hallucination\n2. Handoff - if user ask the same question more than twice then redirect to human agent\n3. Right source  - specially useful in case of policy related answers\n4. Out of source question - \n5. Right tool\n6. High risk questions - share alternative safe mode\n7. Say no when it doesn't know instead of giving wrong answer confidently\n\nType of eval\n- Offline - Runs before change, gives final good to go or not answer\n- Online - runs daily on prod, helps to understand on a daily basis\n\nMistakes\n- Fuzzy rules\n- Starting with all the 5 at once. Start with hallucination & handoff\n- fake clean examples - use real dirty, hinglish logs\n- never refreshing - refresh after every new incident identified\n- too many owners - one person who say whether it is FAIL/ PASS"
+    },
+    "57": {
+      "veryImportant": true,
+      "status": "done",
+      "doneAt": 1779718955063,
+      "lastRead": "26 May",
+      "examples": [
+        {
+          "company": "Anthropic (Claude Projects)",
+          "what": "Claude Projects is used as a worked example in the article to demonstrate the full 5-dimension product sense framework end-to-end.",
+          "why": "An AI PM can reference Claude Projects to show they understand how to scope a real AI product — from its mission of safe, helpful AI assistance to concrete user segments like knowledge workers managing complex, ongoing tasks."
+        },
+        {
+          "company": "Meta",
+          "what": "Meta's Gardening (likely a Facebook/Instagram community or feature) is used as a second full worked example to practice the framework on a non-AI, community-driven product.",
+          "why": "Knowing how to apply product sense to social and community features matters because many Indian tech companies like ShareChat, Meesho, and Jio build heavily around community and vernacular user behaviour."
+        },
+        {
+          "company": "Netflix",
+          "what": "Netflix Podcast integration is used as the third worked example, illustrating how an established streaming platform might expand into a new content format.",
+          "why": "This is directly relevant for AI PMs because podcast and audio features involve recommendation algorithms and content discovery — areas where AI product decisions around personalisation and surfacing are central."
+        }
+      ]
+    },
+    "58": {
+      "status": "done",
+      "doneAt": 1779731685720,
+      "lastRead": "30 May"
+    },
+    "61": {
+      "lastRead": "18 Jun",
+      "notes": "There are 4 steps in the process of search.\n\n1. Lexical - divided into 5 parts\n- Normalization - make everything in small so IPHONE becomes iphone\n- stemming - Reduce words, running becomes run\n- query expansion - add similar to words like kurta become kurti, ethnic wear, etc\n- query relaxation - if someone types big query with details like cotton kurta under rs. 500, it first tries and remove 500, then cotton, this way your query get more results\n- query translation - Understand intent of the user so when you search for indo western for wedding it find sherwani for you. \n\nGraph based - Think of like tree with branches Category will have sub categories, sub categories will have product names and product will have mapping with content names. When someone searches for a product, it gets mapped to category.  For ex - diwali outfit, the words gets divided into diwali and outfit and under diwali it find categories like kurta, saree, etc. Even though none of the product had it explicitly written\n\nembedding - convert text to numbers and save them in a vector where words with similar meaning sits in a close sphere of each other. So, earphone, headphone, wireless all are close. When user search for one others also show\nSelf supervised - use at the start, looks at user who searched x, also searched y and tries to find out the answer\nSupervised two tower model - two separate neural network - one encode query, other encode product\n\nSupervised = the model learned from labeled examples. In this case, the labels aren't manual — they come from real user behavior (\"business events\"):\n\nUser searched X and clicked product Y → that's a positive match\nUser searched X and ignored product Z → that's a negative match\n\nThe model trains by adjusting its encodings until queries and their clicked products land close together in that number space, and ignored products land far away.\n\na query and a product are different kinds of things — they come from different sources, have different structures, and need different features to describe them.\n\nQuery tower takes in: search text, user history, context (time, device, etc.)\nProduct tower takes in: product title, category, price, past clicks, etc.\n\nEach tower is a separate neural net that produces an encoding. Then you simply compare the two numbers — if they're close, it's a good match.\n\nNext step is ranking",
+      "veryImportant": true,
+      "status": "done",
+      "doneAt": 1780068244842,
+      "queued": false
+    },
+    "62": {
+      "status": "done",
+      "doneAt": 1779731832980
+    },
+    "65": {
+      "lastRead": "29 May"
+    },
+    "68": {
+      "lastRead": "29 May"
+    },
+    "70": {
+      "lastRead": "29 May"
+    },
+    "71": {
+      "lastRead": "29 May"
+    },
+    "73": {
+      "queued": true
+    },
+    "74": {
+      "queued": true
+    },
+    "79": {
+      "queued": true
+    },
+    "85": {
+      "queued": true
+    },
+    "86": {
+      "queued": true
+    },
+    "90": {
+      "queued": true
+    },
+    "96": {
+      "queued": true
+    },
+    "113": {
+      "queued": true
+    },
+    "exDone_alibaba-real-time-recommendations": true,
+    "exImp_alibaba-real-time-recommendations": false,
+    "exDone_amazon-semantic-product-search": true,
+    "exDone_position-bias-two-module-model": true,
+    "exDone_doordash-llm-homepage": true,
+    "exDone_air-canada-chatbot-liability": true
+  }
 }
