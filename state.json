@@ -504,7 +504,20 @@
     "51": {
       "lastRead": "29 Jun",
       "queued": true,
-      "veryImportant": true
+      "veryImportant": true,
+      "quizHistory": [
+        {
+          "score": 4,
+          "total": 10,
+          "date": "8 Jul 2026"
+        }
+      ],
+      "quizBest": 4,
+      "quizLast": {
+        "score": 4,
+        "total": 10,
+        "date": "8 Jul 2026"
+      }
     },
     "54": {
       "queued": true
