@@ -364,6 +364,10 @@
   .qz-score-big{font-size:2.8rem;font-weight:800;color:var(--amber);line-height:1;}
   .qz-score-sub{font-size:.82rem;color:var(--text-muted);margin:.3rem 0 .8rem;}
   .qz-score-msg{font-size:.84rem;color:var(--text-secondary);line-height:1.6;}
+  .qz-history{margin-top:.85rem;padding-top:.75rem;border-top:.5px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;}
+  .qz-history-label{font-size:11px;color:var(--text-muted);margin-right:.25rem;}
+  .qz-history-item{font-size:12px;font-weight:600;color:var(--text-secondary);background:var(--surface);border:.5px solid var(--border);border-radius:99px;padding:2px 10px;display:flex;align-items:center;gap:5px;}
+  .qz-history-date{font-size:10px;font-weight:400;color:var(--text-muted);}
   /* Compact modal */
   .modal-compact-body{padding:1.1rem 1.25rem;overflow-y:auto;flex:1;font-family:'DM Sans',sans-serif;font-size:15.5px;line-height:1.75;}
   .modal-compact-body .sec{margin-bottom:16px;}
@@ -1363,7 +1367,18 @@ function openQuiz(id){
   _qzId=id;_qzDone=new Set();_qzCorrect=0;
   const r=RES.find(x=>x.id===id);
   document.getElementById('qzTitle').textContent=r?r.title:'';
-  document.getElementById('qzResetBtn').style.display='none';
+  // Show last score + retry if previously attempted
+  const last=gs(id,'quizLast',null);
+  const history=gs(id,'quizHistory',[]);
+  if(last){
+    document.getElementById('qzScoreLabel').textContent=`Last: ${last.score}/${last.total} · ${last.date}`;
+    document.getElementById('qzScoreLabel').style.display='';
+    document.getElementById('qzResetBtn').style.display='';
+    document.getElementById('qzResetBtn').textContent=history.length>1?`↺ Retry (${history.length}x)`:'↺ Retry';
+  } else {
+    document.getElementById('qzScoreLabel').style.display='none';
+    document.getElementById('qzResetBtn').style.display='none';
+  }
   quizRender();
   openModal('quizModal');
 }
@@ -1423,9 +1438,22 @@ function quizShowScore(){
     [10,10,"Perfect. You are ready to answer this in an interview."]
   ];
   const msg=msgs.find(([a,b])=>s>=a&&s<=b)||msgs[0];
+
+  // Save score to state
+  const dateStr=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  const history=gs(_qzId,'quizHistory',[]);
+  history.push({score:s,total,date:dateStr});
+  set(_qzId,'quizHistory',history);
+  set(_qzId,'quizBest',Math.max(s,gs(_qzId,'quizBest',0)));
+  set(_qzId,'quizLast',{score:s,total,date:dateStr});
+  render(); // refresh card badges
+
+  // Build history HTML
+  const histHTML=history.length>1?`<div class="qz-history"><span class="qz-history-label">Past attempts:</span>${history.slice(-5).reverse().slice(1).map(h=>`<span class="qz-history-item">${h.score}/${h.total} <span class="qz-history-date">${h.date}</span></span>`).join('')}</div>`:'';
+
   const card=document.createElement('div');
   card.className='qz-score-card';
-  card.innerHTML=`<div class="qz-score-big">${s}/${total}</div><div class="qz-score-sub">Your score</div><div class="qz-score-msg">${msg[2]}</div>`;
+  card.innerHTML=`<div class="qz-score-big">${s}/${total}</div><div class="qz-score-sub">Score saved · ${dateStr}</div><div class="qz-score-msg">${msg[2]}</div>${histHTML}`;
   document.getElementById('qzBody').prepend(card);
   document.getElementById('qzBody').scrollTop=0;
   document.getElementById('qzScoreLabel').textContent=`${s}/${total}`;
@@ -1435,8 +1463,15 @@ function quizShowScore(){
 
 function quizReset(){
   _qzDone=new Set();_qzCorrect=0;
+  // Keep last score visible in label while retrying
+  const last=gs(_qzId,'quizLast',null);
+  if(last){
+    document.getElementById('qzScoreLabel').textContent=`Last: ${last.score}/${last.total} · ${last.date}`;
+    document.getElementById('qzScoreLabel').style.display='';
+  } else {
+    document.getElementById('qzScoreLabel').style.display='none';
+  }
   document.getElementById('qzResetBtn').style.display='none';
-  document.getElementById('qzScoreLabel').style.display='none';
   quizRender();
   document.getElementById('qzBody').scrollTop=0;
 }
@@ -1816,7 +1851,7 @@ ${topics.length?'<div class="topic-chips">'+topics.map(t=>'<span class="topic-ch
 <div class="div-line"></div>
 <div class="actions">
   ${hasCP?`<button class="btn bcp" onclick="openCompact(${r.id})">Compact</button>`:''}
-  ${getMCQ(r.id)?`<button class="btn" style="color:var(--amber);" onclick="openQuiz(${r.id})">⊙ Test Yourself</button>`:''}
+  ${getMCQ(r.id)?`<button class="btn" style="color:var(--amber);" onclick="openQuiz(${r.id})">⊙ Test Yourself${gs(r.id,'quizLast',null)?` <span style="font-size:11px;font-weight:600;opacity:.75;">${gs(r.id,'quizLast').score}/${gs(r.id,'quizLast').total}</span>`:''}${gs(r.id,'quizHistory',[]).length>1?` <span style="font-size:10px;opacity:.5;">best ${gs(r.id,'quizBest')}/${getMCQ(r.id).length}</span>`:''}</button>`:''}
   <button class="btn" onclick="openNotes(${r.id})">Notes${notes?' ✎':''}</button>
   <button class="btn bq ${isQueued?'queued':''}" onclick="toggleQueue(${r.id})" title="${isQueued?'Remove from queue':'Add to next reads'}">${isQueued?'🔖 Queued':'🔖 Queue'}</button>
 </div>
