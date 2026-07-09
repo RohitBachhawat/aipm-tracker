@@ -431,7 +431,9 @@
       "insightsDate": "18 May"
     },
     "42": {
-      "lastRead": "9 Jul"
+      "lastRead": "9 Jul",
+      "status": "done",
+      "doneAt": 1783584766232
     },
     "43": {
       "queued": false,
