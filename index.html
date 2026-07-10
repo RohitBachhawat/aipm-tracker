@@ -2166,21 +2166,16 @@ function toggleExamplesView(){
   const ev=document.getElementById('examplesView');
   const cl=document.getElementById('cardList');
   const nu=document.getElementById('nuSec');
-  /* INSIGHTS close block (commented out)
-  const iv=document.getElementById('insightsView');
   const btn=document.getElementById('examplesToggleBtn');
   if(examplesOpen){
     document.getElementById('mainControls').style.display='none';
     if(ev)ev.classList.add('open');
     if(cl)cl.style.display='none';
     if(nu)nu.style.display='none';
-    if(iv)iv.classList.remove('open');
+    // INSIGHTS: if(iv)iv.classList.remove('open'); insightsOpen=false; — removed (insights disabled)
     if(btn)btn.style.color='var(--sage)';
-    insightsOpen=false;
-    // document.getElementById('insightsToggleBtn').style.color='#f43f5e'; // INSIGHTS (commented out)
     renderExamplesView();
-  }
-  */ else {
+  } else {
     document.getElementById('mainControls').style.display='';
     if(ev)ev.classList.remove('open');
     if(cl)cl.style.display='';
