@@ -276,6 +276,7 @@
   .empty{text-align:center;padding:2.5rem;color:var(--text-muted);font-size:14px;font-family:'DM Sans',sans-serif;}
   .empty i{display:block;margin-bottom:8px;font-size:25px;}
 
+  /* ── INSIGHTS FEATURE — commented out, re-enable by removing these comment tags ──
   /* ── INSIGHTS VIEW ── */
   .insights-view{display:none;margin-top:1rem;}
   .insights-view.open{display:block;}
@@ -428,7 +429,8 @@
   .ex-meta{font-size:12px;color:var(--text-muted);margin-top:2px;}
   .ex-back{background:none;border:.5px solid var(--border);border-radius:999px;padding:4px 14px;font-size:12px;color:var(--text-secondary);cursor:pointer;font-family:'DM Sans',sans-serif;}
   .ex-back:hover{border-color:var(--border-strong);color:var(--text-primary);}
-  /* Filter bar — shared with insights view */
+  ── END INSIGHTS CSS ── */
+    /* Filter bar — shared with insights view */
   .ex-filters{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;align-items:center;}
   .ex-stat-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
   .ex-fdd{position:relative;display:inline-block;}
@@ -626,7 +628,7 @@ body.dark .gbtn{background:var(--text-primary);color:var(--stn-color);}
     </div>
     <div class="header-actions" style="position:relative;">
       <button class="hbtn search-ico-btn" onclick="toggleExamplesView()" id="examplesToggleBtn" title="Examples" style="font-size:18px;margin-right:2px;color:#f43f5e;">⬡</button>
-      <button class="hbtn search-ico-btn" id="insightsToggleBtn" onclick="toggleInsightsView()" title="Insights" style="font-size:20px;margin-right:2px;color:#f43f5e;">✦</button>
+      <!-- INSIGHTS BUTTON (commented out) <button class="hbtn search-ico-btn" id="insightsToggleBtn" onclick="toggleInsightsView()" title="Insights" style="font-size:20px;margin-right:2px;color:#f43f5e;">✦</button> END INSIGHTS BUTTON -->
       <button class="hbtn search-ico-btn" id="darkModeBtn" onclick="toggleDarkMode()" title="Toggle dark / light mode" style="font-size:17px;">🌙</button>
       <button class="hbtn" onclick="importProgress()" title="Restore from a saved JSON backup"><span>↑</span> Import</button>
       <button class="hbtn" onclick="exportProgress()" title="Save your progress as a JSON backup"><span>↓</span> Export</button>
@@ -729,6 +731,7 @@ body.dark .gbtn{background:var(--text-primary);color:var(--stn-color);}
 </div>
 <div id="cardList" style="margin-top:1rem;"></div>
 
+<!-- INSIGHTS VIEW (commented out — re-enable with insights feature)
 <div class="insights-view" id="insightsView">
   <div class="iv-header">
     <div>
@@ -743,6 +746,8 @@ body.dark .gbtn{background:var(--text-primary);color:var(--stn-color);}
   <div class="iv-filters" id="ivFilters"></div>
   <div id="ivCards"></div>
 </div>
+
+END INSIGHTS VIEW -->
 
 <div class="examples-view" id="examplesView">
   <div class="ex-header">
@@ -1122,7 +1127,8 @@ async function _doLoadState(){
   }catch(e){state={};}
   // Backup banner hidden — state now syncs to GitHub automatically
   cf='to-read';
-  // Backfill insightsDate for articles that have insights but no date yet
+  /* INSIGHTS BACKFILL (commented out — re-enable with insights feature)
+  / Backfill insightsDate for articles that have insights but no date yet
   const today=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'});
   RES.forEach(r=>{
     if(gs(r.id,'insights',null)&&!gs(r.id,'insightsDate',null)){
@@ -1130,6 +1136,7 @@ async function _doLoadState(){
       state[r.id].insightsDate=today;
     }
   });
+  */
 
   ss(state);
   render();
@@ -1935,6 +1942,9 @@ function render(){
 }
 
 
+/* ── INSIGHTS FEATURE (commented out) ──────────────────────────────────────
+   To re-enable: uncomment this block + CSS section + HTML button
+   + insightsView div + backfill block in _doLoadState
 // ── INSIGHTS ─────────────────────────────────────────────────────────────────
 let insightsOpen=false;
 let ivTopicFilter='';
@@ -2126,6 +2136,7 @@ function regenInsights(id){
   set(id,'insights',null);
   generateInsights(id);
 }
+── END INSIGHTS FEATURE ── */
 
 // Insights auto-generate when insights view is opened
 
@@ -2155,6 +2166,7 @@ function toggleExamplesView(){
   const ev=document.getElementById('examplesView');
   const cl=document.getElementById('cardList');
   const nu=document.getElementById('nuSec');
+  /* INSIGHTS close block (commented out)
   const iv=document.getElementById('insightsView');
   const btn=document.getElementById('examplesToggleBtn');
   if(examplesOpen){
@@ -2165,9 +2177,10 @@ function toggleExamplesView(){
     if(iv)iv.classList.remove('open');
     if(btn)btn.style.color='var(--sage)';
     insightsOpen=false;
-    document.getElementById('insightsToggleBtn').style.color='#f43f5e';
+    // document.getElementById('insightsToggleBtn').style.color='#f43f5e'; // INSIGHTS (commented out)
     renderExamplesView();
-  } else {
+  }
+  */ else {
     document.getElementById('mainControls').style.display='';
     if(ev)ev.classList.remove('open');
     if(cl)cl.style.display='';
