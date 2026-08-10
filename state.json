@@ -344,7 +344,8 @@
       "lastRead": "29 May"
     },
     "34": {
-      "queued": true
+      "queued": true,
+      "lastRead": "10 Aug"
     },
     "35": {
       "notes": "I understood very limited from this article. \n\nInstead of calling all the experts and running Billions of parameters, MOE helps with choosing 2-3 experts and limited parameters leading to lower cost and fast response. MOE is the architecture that helps in reducing cost, but at the same time giving similar performance to other models who are calling all the experts. \n\nHospital example was good, easy to understand. \n\nTradeoff:\n1. Memory intensive - All the parameters needs to be loaded even when limited are active\n2. FIne tuning is harder - model tries to overfit in small datasets\n3. Load balancing is hard - Limited experts are getting used all the time, idle ones loose efficiency and the limited experts gets overwhelmed ",
