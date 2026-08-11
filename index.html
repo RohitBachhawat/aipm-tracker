@@ -320,6 +320,24 @@
   .iv-fb:hover{opacity:.8;}
   .iv-empty{text-align:center;padding:2.5rem;color:var(--text-muted);font-size:13px;font-family:'DM Sans',sans-serif;}
 
+  /* ── BOOKMARKED INTERVIEW ANSWERS (compact view) ── */
+  .modal-compact-body .hl{position:relative;}
+  .modal-compact-body .hl.hl-has-bm{padding-right:2.7rem;}
+  .hl-bm-btn{position:absolute;top:8px;right:8px;background:var(--surface);border:.5px solid var(--amber-border);border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--amber);cursor:pointer;transition:transform .15s,background .15s,color .15s;line-height:1;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+  .hl-bm-btn:hover{transform:scale(1.08);}
+  .hl-bm-btn.on{background:var(--amber);color:var(--stn-color);}
+  .bm-card-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 9px;border-radius:999px;background:var(--amber-soft);border:.5px solid var(--amber-border);color:var(--amber);font-family:'DM Sans',sans-serif;white-space:nowrap;font-weight:500;}
+  .bm-card{background:var(--surface);border:.5px solid var(--border);border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:10px;box-shadow:var(--card-shadow);}
+  .bm-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;cursor:pointer;}
+  .bm-card-top:hover .bm-card-title{color:var(--sage);}
+  .bm-card-title{font-family:'Lora',Georgia,serif;font-size:1rem;font-weight:500;color:var(--text-primary);line-height:1.4;flex:1;}
+  .bm-card-meta{font-size:11.5px;color:var(--text-muted);margin-top:3px;font-family:'DM Sans',sans-serif;}
+  .bm-card-actions{display:flex;gap:6px;flex-shrink:0;}
+  .bm-remove-btn{background:none;border:.5px solid var(--border);border-radius:6px;padding:3px 8px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all .15s;line-height:1;}
+  .bm-remove-btn:hover{border-color:var(--rose-border);color:var(--rose);}
+  .bm-card-q{font-size:12px;font-weight:500;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;}
+  .bm-card-answer{font-size:14px;color:var(--text-primary);line-height:1.7;background:var(--amber-soft);border:.5px solid var(--amber-border);border-radius:8px;padding:.75rem 1rem;font-family:'DM Sans',sans-serif;}
+
   /* ── MODAL ── */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
   .modal-overlay.open{opacity:1;pointer-events:all;}
@@ -628,6 +646,7 @@ body.dark .gbtn{background:var(--text-primary);color:var(--stn-color);}
     </div>
     <div class="header-actions" style="position:relative;">
       <button class="hbtn search-ico-btn" onclick="toggleExamplesView()" id="examplesToggleBtn" title="Examples" style="font-size:18px;margin-right:2px;color:#f43f5e;">⬡</button>
+      <button class="hbtn search-ico-btn" onclick="toggleBookmarksView()" id="bookmarksToggleBtn" title="Bookmarked interview answers" style="font-size:18px;margin-right:2px;color:#f43f5e;">📌</button>
       <!-- INSIGHTS BUTTON (commented out) <button class="hbtn search-ico-btn" id="insightsToggleBtn" onclick="toggleInsightsView()" title="Insights" style="font-size:20px;margin-right:2px;color:#f43f5e;">✦</button> END INSIGHTS BUTTON -->
       <button class="hbtn search-ico-btn" id="darkModeBtn" onclick="toggleDarkMode()" title="Toggle dark / light mode" style="font-size:17px;">🌙</button>
       <button class="hbtn" onclick="importProgress()" title="Restore from a saved JSON backup"><span>↑</span> Import</button>
@@ -769,6 +788,18 @@ END INSIGHTS VIEW -->
   </div>
   <div id="exCards"></div>
   <div class="ex2-hidden-section" id="exHiddenSection" style="display:none;"></div>
+</div>
+
+<!-- Bookmarked interview answers view -->
+<div class="insights-view" id="bookmarksView">
+  <div class="iv-header">
+    <div>
+      <div class="iv-title">📌 Bookmarked Answers</div>
+      <div class="iv-meta" id="bmMeta"></div>
+    </div>
+    <button class="iv-back" onclick="toggleBookmarksView()">← Back</button>
+  </div>
+  <div id="bmCards"></div>
 </div>
 
 <!-- Examples modal -->
@@ -1626,6 +1657,146 @@ function renderSum(p){
   return`<div style="margin-bottom:12px;"><div class="scr"><div class="sn" style="color:${sc}">${p.score}<span style="font-size:1rem;color:var(--text-muted)">/100</span></div><div style="font-size:13px;color:var(--text-secondary);">Understanding score based on your notes</div></div></div>${g?`<div style="margin-bottom:12px;"><div class="sl2">Gaps to fix</div>${g}</div>`:''}<div><div class="sl2">Your 60-second interview answer</div><div style="background:var(--sage-soft);border:.5px solid var(--sage-border);border-radius:8px;padding:.75rem 1rem;font-size:14px;color:var(--text-primary);line-height:1.7;">${p.interview_answer}</div></div>`;
 }
 
+// ── Bookmarked interview answers (compact view) ─────────────────────────────
+// A bookmarkable snippet is a `<div class="hl"><strong>"Question"</strong>Answer</div>`
+// block whose question is a quoted string — i.e. an actual Q&A pair, not a
+// generic highlight callout. Stored per-article as {snippetIndex: {q,a,at}}.
+let bookmarksOpen=false;
+const gcbm=id=>gs(id,'bmSnippets',{});
+
+function escHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function toggleSnippetBookmark(id,idx,q,a){
+  const map=Object.assign({},gcbm(id));
+  const wasOn=!!map[idx];
+  if(wasOn)delete map[idx];
+  else map[idx]={q,a,at:Date.now()};
+  set(id,'bmSnippets',map);
+  showToast(wasOn?'Bookmark removed':'📌 Bookmarked for revision');
+  render(); // refresh card badge
+  if(bookmarksOpen)renderBookmarksView();
+  return !wasOn;
+}
+
+// Scans the rendered compact content for quoted-question .hl blocks and
+// injects a bookmark toggle on each one. Must run after cmBody.innerHTML is set.
+function processCompactBookmarks(id){
+  const body=document.getElementById('cmBody');
+  if(!body)return;
+  const map=gcbm(id);
+  let idx=0;
+  body.querySelectorAll('div.hl').forEach(hl=>{
+    const strong=hl.querySelector('strong');
+    if(!strong)return;
+    const qText=strong.textContent.trim();
+    if(!/^["“]/.test(qText))return; // only actual quoted Q&A pairs
+    const snippetIdx=idx++;
+    const clone=hl.cloneNode(true);
+    const strongInClone=clone.querySelector('strong');
+    if(strongInClone)strongInClone.remove();
+    const aText=clone.textContent.trim();
+    hl.classList.add('hl-has-bm');
+    const on=!!map[snippetIdx];
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='hl-bm-btn'+(on?' on':'');
+    btn.title=on?'Remove bookmark':'Bookmark this answer for revision';
+    btn.textContent=on?'📌':'☆';
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const nowOn=toggleSnippetBookmark(id,snippetIdx,qText,aText);
+      btn.classList.toggle('on',nowOn);
+      btn.title=nowOn?'Remove bookmark':'Bookmark this answer for revision';
+      btn.textContent=nowOn?'📌':'☆';
+    });
+    hl.appendChild(btn);
+  });
+}
+
+function toggleBookmarksView(){
+  bookmarksOpen=!bookmarksOpen;
+  const bv=document.getElementById('bookmarksView');
+  const cl=document.getElementById('cardList');
+  const nu=document.getElementById('nuSec');
+  const bb=document.getElementById('backupBanner');
+  const btn=document.getElementById('bookmarksToggleBtn');
+  if(bookmarksOpen){
+    if(typeof examplesOpen!=='undefined'&&examplesOpen){
+      examplesOpen=false;
+      const ev=document.getElementById('examplesView');
+      if(ev)ev.classList.remove('open');
+      const exBtn=document.getElementById('examplesToggleBtn');
+      if(exBtn)exBtn.style.color='#f43f5e';
+    }
+    document.getElementById('mainControls').style.display='none';
+    if(bv)bv.classList.add('open');
+    if(cl)cl.style.display='none';
+    if(nu)nu.style.display='none';
+    if(bb&&bb.style.display!=='none')bb.style.display='none';
+    if(btn)btn.style.color='var(--sage)';
+    renderBookmarksView();
+  } else {
+    document.getElementById('mainControls').style.display='';
+    if(bv)bv.classList.remove('open');
+    if(cl)cl.style.display='';
+    if(btn)btn.style.color='#f43f5e';
+    render();
+  }
+}
+
+function getAllBookmarkedSnippets(){
+  const out=[];
+  RES.forEach(r=>{
+    const map=gcbm(r.id);
+    Object.keys(map).forEach(k=>{
+      out.push({articleId:r.id,articleTitle:r.title,src:r.src,snippetIdx:k,q:map[k].q,a:map[k].a,at:map[k].at||0});
+    });
+  });
+  out.sort((x,y)=>y.at-x.at);
+  return out;
+}
+
+function renderBookmarksView(){
+  const list=getAllBookmarkedSnippets();
+  const meta=document.getElementById('bmMeta');
+  if(meta)meta.textContent=list.length+' saved answer'+(list.length!==1?'s':'')+' · revisit these right before your interview';
+  const cards=document.getElementById('bmCards');
+  if(!cards)return;
+  if(!list.length){
+    cards.innerHTML='<div class="iv-empty">No bookmarked answers yet.<br>Open an article\'s Compact view and tap ☆ on any interview answer to save it here.</div>';
+    return;
+  }
+  cards.innerHTML=list.map(s=>mkBookmarkCard(s)).join('');
+}
+
+function mkBookmarkCard(s){
+  return`<div class="bm-card">
+  <div class="bm-card-top" onclick="openCompact(${s.articleId})">
+    <div>
+      <div class="bm-card-title">#${s.articleId} ${escHtml(s.articleTitle)}</div>
+      <div class="bm-card-meta">${srcLabel(s.src)}</div>
+    </div>
+    <div class="bm-card-actions">
+      <button class="bm-remove-btn" onclick="event.stopPropagation();removeBookmarkFromView(${s.articleId},'${s.snippetIdx}')" title="Remove bookmark">✕</button>
+    </div>
+  </div>
+  <div class="bm-card-q">${escHtml(s.q)}</div>
+  <div class="bm-card-answer">${escHtml(s.a)}</div>
+</div>`;
+}
+
+function removeBookmarkFromView(id,idxKey){
+  if(!confirm('Remove this bookmarked answer? You can bookmark it again later from Compact view.'))return;
+  const map=Object.assign({},gcbm(id));
+  delete map[idxKey];
+  set(id,'bmSnippets',map);
+  showToast('Bookmark removed');
+  renderBookmarksView();
+  if(_cmCurrentId===id)processCompactBookmarks(id); // refresh open compact modal, if any
+}
+
 function setTab(t){cf=t;render();}
 function toggleDd(id){
   const dd=document.getElementById(id);
@@ -1830,6 +2001,7 @@ function mkCard(r){
   const isDone=gst(r.id)==='done';
   const isVI=gs(r.id,'veryImportant',false);
   const isQueued=gs(r.id,'queued',false);
+  const isBm=Object.keys(gcbm(r.id)).length>0;
   const topics=gtopics(r.id);
   const notes=gn(r.id);const hasSm=!!gsm(r.id);
   const hasCP=!!r.cc;
@@ -1844,6 +2016,7 @@ function mkCard(r){
     <span class="src-badge ${r.src}">${srcLabel(r.src)}</span>
     ${isVI?'<span class="vi-badge"><span style="font-size:11px;">⚡</span> Very Important</span>':''}
     ${isQueued?'<span class="queue-badge">🔖 Up next</span>':''}
+    ${isBm?'<span class="bm-card-badge">📌 Bookmarked</span>':''}
   </div>
   <div class="card-right">
     ${dt?`<span class="read-time">${dt} <span style="opacity:.35;margin:0 1px;">|</span> ~${rt} min</span>`:`<span class="read-time">~${rt} min</span>`}
@@ -2529,6 +2702,7 @@ function _loadCmSource(id){
   body.scrollTop=0;
   _syncCmNavBtns();
   _syncCmActionBtns();
+  processCompactBookmarks(id);
 }
 
 function _syncCmNavBtns(){
