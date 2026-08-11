@@ -309,7 +309,14 @@
     },
     "23": {
       "lastRead": "11 Aug",
-      "queued": true
+      "queued": true,
+      "bmSnippets": {
+        "0": {
+          "q": "\"How would you evaluate a food delivery / Swiggy / Zomato AI feature?\"",
+          "a": "Two layers: Hard Gate (Python) for price accuracy, schema validation, constraint compliance — any failure blocks the response. LLM-as-Judge for empathy, tone, persuasiveness — batch job overnight, score tracked on dashboard. I'd write separate rubrics per dimension using G-Eval (reasoning before score) and calibrate the judge against 50 human-labelled examples before trusting it.",
+          "at": 1786427750637
+        }
+      }
     },
     "30": {
       "queued": false,
