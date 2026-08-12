@@ -530,7 +530,14 @@
         "date": "8 Jul 2026"
       },
       "status": "done",
-      "doneAt": 1786345597167
+      "doneAt": 1786345597167,
+      "bmSnippets": {
+        "0": {
+          "q": "\"How do you evaluate whether an AI feature is working?\"",
+          "a": "\"I'd build a three-level eval system before writing a single line of product code. First, unit tests — deterministic assertions about the behaviours that can never be wrong. For a Swiggy support bot: response never names a competitor, refund amount matches policy, language matches the user's query. These run on every code change. Second, human evaluation — I'd log every trace from day one, build a simple viewer to look at them, and label 50 a week as binary pass or fail. Not helpful/not helpful on a 1-5 scale — just pass or fail with a note. Third, LLM-as-Judge — only after I have 200+ human-labelled examples to calibrate against. The three levels are also the same infrastructure for fine-tuning and debugging, so it's one system serving three purposes.\"",
+          "at": 1786514536605
+        }
+      }
     },
     "54": {
       "queued": true
