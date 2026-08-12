@@ -1,3 +1,13 @@
 {
-  "aipm_v7": {}
+  "aipm_v7": {
+    "7": {
+      "bmSnippets": {
+        "0": {
+          "q": "\"How would you evaluate a RAG system you just built for a customer support product?\"",
+          "a": "\"I'd evaluate at two layers — retrieval and generation — because they fail in different ways. At the retrieval layer, I'd track Precision@K (are the docs we retrieve actually relevant?), Recall@K (are we missing any relevant docs?), and MRR (are the right docs ranked at the top, where the LLM actually reads them?). At the generation layer, I'd track faithfulness via NLI — does the answer contradict any retrieved doc? — and hallucination rate. The key PM decision is setting K deliberately: for a support agent, precision matters more than recall because a hallucination caused by noisy context damages user trust in a way a missing answer doesn't. I'd set K=3-5, track all five metrics on a daily sample of 30 outputs, and never change K without an A/B test against a held-out eval set. The reason the A/B test matters: a change that improves Precision@5 can hurt MRR — only end-to-end measurement catches the interaction.\"",
+          "at": 1786544185412
+        }
+      }
+    }
+  }
 }
