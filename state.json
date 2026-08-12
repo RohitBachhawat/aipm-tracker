@@ -6,6 +6,11 @@
           "q": "\"How would you evaluate a RAG system you just built for a customer support product?\"",
           "a": "\"I'd evaluate at two layers — retrieval and generation — because they fail in different ways. At the retrieval layer, I'd track Precision@K (are the docs we retrieve actually relevant?), Recall@K (are we missing any relevant docs?), and MRR (are the right docs ranked at the top, where the LLM actually reads them?). At the generation layer, I'd track faithfulness via NLI — does the answer contradict any retrieved doc? — and hallucination rate. The key PM decision is setting K deliberately: for a support agent, precision matters more than recall because a hallucination caused by noisy context damages user trust in a way a missing answer doesn't. I'd set K=3-5, track all five metrics on a daily sample of 30 outputs, and never change K without an A/B test against a held-out eval set. The reason the A/B test matters: a change that improves Precision@5 can hurt MRR — only end-to-end measurement catches the interaction.\"",
           "at": 1786544185412
+        },
+        "1": {
+          "q": "\"The RAG system is hallucinating. How do you diagnose and fix it?\"",
+          "a": "\"First, I'd separate retrieval hallucination from generation hallucination — they have different fixes. Retrieval hallucination: the model retrieved the wrong docs, so the answer is based on irrelevant context. Diagnosis: check Precision@K — if it's low, the model is generating from noise. Fix: improve the embedding model, add a reranker, or reduce K. Generation hallucination: the model retrieved the right docs but fabricated claims not present in them. Diagnosis: run NLI faithfulness check — does the answer entail the retrieved docs? Fix: add an explicit instruction in the system prompt ('only answer from the provided context, say I don't know otherwise'), lower temperature, or add a post-generation faithfulness filter. The most common mistake is jumping straight to 'let's try a better model' when the actual problem is retrieval — Precision@K of 0.40 means 60% of what the model sees is noise, and no model generates well from that.\"",
+          "at": 1786544244433
         }
       }
     }
