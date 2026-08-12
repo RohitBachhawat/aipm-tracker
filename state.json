@@ -536,6 +536,11 @@
           "q": "\"How do you evaluate whether an AI feature is working?\"",
           "a": "\"I'd build a three-level eval system before writing a single line of product code. First, unit tests — deterministic assertions about the behaviours that can never be wrong. For a Swiggy support bot: response never names a competitor, refund amount matches policy, language matches the user's query. These run on every code change. Second, human evaluation — I'd log every trace from day one, build a simple viewer to look at them, and label 50 a week as binary pass or fail. Not helpful/not helpful on a 1-5 scale — just pass or fail with a note. Third, LLM-as-Judge — only after I have 200+ human-labelled examples to calibrate against. The three levels are also the same infrastructure for fine-tuning and debugging, so it's one system serving three purposes.\"",
           "at": 1786514536605
+        },
+        "1": {
+          "q": "\"We're improving our AI product but can't tell if changes are helping. What do we do?\"",
+          "a": "\"This is an evals problem, not a model problem. The first question is: do you have unit tests running on every change? If not, you can't detect regressions. Second: are you systematically reading traces? Not dashboards — actual conversations. The answer is almost always hiding in the data. Third: are you using binary pass/fail labels or Likert scales? Likert scales create labeller disagreement and make it impossible to track progress cleanly. The fix: build a trace viewer that takes a day, add binary labelling, and read 50 traces per week. Within two weeks, you'll have a clear picture of what's failing and why.\"",
+          "at": 1786514541920
         }
       }
     },
