@@ -399,7 +399,14 @@
         }
       ],
       "insightsDate": "18 May",
-      "lastRead": "13 Aug"
+      "lastRead": "13 Aug",
+      "bmSnippets": {
+        "0": {
+          "q": "\"How do you approach building an AI feature?\"",
+          "a": "\"I start with the 6-question loop before writing any spec. What real work does it help with? What does good output look like? What context does the AI need? How do we catch wrong output? What's the safest first version? When does a human stay in the loop? If I can't answer all 6, the feature isn't ready to build. Then I use the trust ladder to pick the right starting autonomy level — almost always Rung 1 or 2, not 4. The one-page spec documents the decisions: context required, forbidden behaviours, fallback logic, test set, success metric.\"",
+          "at": 1786601301384
+        }
+      }
     },
     "39": {
       "lastRead": "29 May"
