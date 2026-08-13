@@ -199,7 +199,14 @@
     "12": {
       "lastRead": "13 Aug",
       "status": "done",
-      "doneAt": 1781770108624
+      "doneAt": 1781770108624,
+      "bmSnippets": {
+        "0": {
+          "q": "\"Design an AI feature for Swiggy / Zomato that feels personalised\"",
+          "a": "\"The core problem is the Goldfish Problem — most AI features reset every session. To fix this, I'd use external memory: store each user's cuisine preferences, dietary restrictions, preferred price range, and order history in a vector store. Every new session retrieves the relevant profile and injects it into the context. The AI then feels like it knows you — not because it's smarter, but because it remembers. The PM's job is to define what goes into the external store, how it updates, and how stale data gets cleaned up.\"",
+          "at": 1786633222297
+        }
+      }
     },
     "20": {
       "notes": "Transformers - Understand more, keep longer context compared to previous method. Compared to past where model might not understand after 20 words, current models can easily understand more and hence give better result\nQKV\nQ - Query, what am I loooking for\nK - Key, what label do I have\nV - Value, What information do I hold\n\nQ*K - The model decides how much attention word A to pay to Word B\n\nPositional encoding - mathematical timestamp to understand which word comes first to derive right value,\nMetrics\n1. Token per second - How many? Higher the token, faster the output\n2. Context window - How many? More the context, better the understanding leading to better result. For long context, complex work, this becomes very important\n3. Hallucination rate - Lower the better\n4. Perplexity - Lower the better? If something new is shared, how model reacts",
