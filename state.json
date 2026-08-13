@@ -258,7 +258,7 @@
       }
     },
     "21": {
-      "lastRead": "29 May",
+      "lastRead": "13 Aug",
       "notes": "MCP is a protocol that helps you connect to different data source using a single standard interface. Think of it similar to API used for connecting data between two companies. MCP is not exactly same, but similar. It lets you talk between your model and specific tool, data source, etc. ",
       "status": "done",
       "doneAt": 1780052962676
