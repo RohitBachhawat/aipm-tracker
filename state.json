@@ -587,7 +587,14 @@
       "veryImportant": true,
       "status": "done",
       "doneAt": 1780068244842,
-      "queued": false
+      "queued": false,
+      "bmSnippets": {
+        "2": {
+          "q": "\"Design the search system for a new Swiggy-like food delivery app.\"",
+          "a": "\"I'd build in three layers in sequence, not all at once. First, lexical search — BM25 on restaurant names, cuisine tags, dish names. Add normalisation, stemming, and a synonym dictionary seeded from common food queries. This covers direct searches like 'pizza near me' and 'McDonald's.' Track zero-result rate as the primary metric — target under 2%. Second, once zero-result rate is stable, add a knowledge graph. Map cuisines to occasions, dishes to cuisines, restaurants to cuisines. 'Something quick and spicy' → resolves to 'fast food' → Thai, Indian, Mexican cuisines → relevant restaurants. This closes the vocabulary gap for occasion-based and mood-based queries. Third, once we have enough click data — roughly 6 months of production traffic — train embeddings on query-click pairs. This captures the associative learning: users who searched 'late night cravings' and clicked on biryani places teach the model that biryani is semantically relevant to that intent. Cold-start restaurants always fall back to Layer 1 until they accumulate enough clicks to have a meaningful embedding.\"",
+          "at": 1786626717766
+        }
+      }
     },
     "62": {
       "status": "done",
