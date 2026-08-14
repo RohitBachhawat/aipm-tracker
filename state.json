@@ -586,7 +586,8 @@
     "58": {
       "status": "done",
       "doneAt": 1779731685720,
-      "lastRead": "14 Aug"
+      "lastRead": "14 Aug",
+      "queued": true
     },
     "61": {
       "lastRead": "13 Aug",
