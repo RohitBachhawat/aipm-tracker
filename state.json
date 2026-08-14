@@ -611,7 +611,14 @@
     "62": {
       "status": "done",
       "doneAt": 1779731832980,
-      "lastRead": "14 Aug"
+      "lastRead": "14 Aug",
+      "bmSnippets": {
+        "0": {
+          "q": "\"Why do most AI products fail to retain users?\"",
+          "a": "\"Benedict Evans framed this well: LLMs look like products and look magic, but they aren't. They're a technology that needs to be packaged into actual products — with the right interface, the right use case, the right trust model. Most AI features fail retention because they were built by asking 'what can we do with AI?' rather than 'what specific user problem does this solve better than anything else?' The use cases with genuine PMF today — coding, marketing copy — are the ones where output is subjective, users can spot errors quickly, and failure is cheap. The ones that haven't found PMF yet — legal, medical, HR — are binary tasks where a wrong answer has real consequences. Until we design AI features that make failure cheap in those domains, retention will lag.\"",
+          "at": 1786687648009
+        }
+      }
     },
     "65": {
       "lastRead": "29 May"
