@@ -953,14 +953,33 @@ async function _ghGetFile(path){
   if(res.status === 404) return null;
   if(!res.ok) throw new Error('GitHub fetch failed: ' + res.status);
   const data = await res.json();
-  _stateSha = data.sha;
+  _stateSha = data.sha; // present regardless of file size, safe to grab here
+
+  // Files over 1MB come back with an EMPTY content field from this standard
+  // endpoint — that's documented GitHub API behavior, not file corruption.
+  // Detect it and re-fetch using the raw media type, which supports files
+  // up to 100MB, instead of misreading "empty" as "broken".
+  if(!data.content || data.encoding === 'none'){
+    const rawRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}?ref=${BRANCH}&_=${Date.now()}`,
+      { headers: { ..._ghHeaders(), 'Accept': 'application/vnd.github.raw+json' } }
+    );
+    if(!rawRes.ok) throw new Error('GitHub raw fetch failed: ' + rawRes.status);
+    const rawText = await rawRes.text();
+    return JSON.parse(rawText);
+  }
+
   return JSON.parse(atob(data.content.replace(/\n/g,'')));
 }
 
 async function _ghPutFile(path, content){
   const body = {
     message: 'sync: update ' + path,
-    content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+    // Compact (not pretty-printed) — pretty-printing roughly triples file
+    // size for no benefit (nobody reads this file by hand), and pushing
+    // state.json past ~1MB is what causes GitHub's Contents API to return
+    // truncated content on read, which then fails JSON.parse entirely.
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(content)))),
     branch: BRANCH
   };
   if(_stateSha) body.sha = _stateSha;
