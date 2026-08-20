@@ -1042,10 +1042,12 @@ function _showTokenModal(onSuccess){
 }
 
 let _useLocalFallback = false;
+let _lastGetDegraded = false; // true when the last get() fell back due to a real GitHub error — NOT a legitimately-empty file
 
 // Drop-in replacement for window.storage
 window.storage = {
   get: async function(key){
+    _lastGetDegraded = false;
     if(_useLocalFallback){
       const v = localStorage.getItem(key);
       return v ? {key, value: v} : null;
@@ -1060,6 +1062,7 @@ window.storage = {
       return { key, value: JSON.stringify(data[key]) };
     }catch(e){
       console.warn('GitHub read failed, using localStorage:', e);
+      _lastGetDegraded = true; // caller must NOT treat this as a trustworthy load
       const v = localStorage.getItem(key);
       return v ? {key, value: v} : null;
     }
@@ -1074,14 +1077,25 @@ window.storage = {
     // Debounce — only write after 2s of no changes
     clearTimeout(_saveQueue);
     _saveQueue = setTimeout(async()=>{
+      // Read current file first to get fresh SHA and merge. If this fetch
+      // fails, we have no reliable way to know what's currently saved —
+      // so we refuse to write at all rather than guessing with an empty
+      // baseline. Guessing wrong here is exactly what wipes real data.
+      let current;
       try{
-        // Read current file first to get fresh SHA and merge
-        let current = {};
-        try{ current = await _ghGetFile(STATE_FILE) || {}; }catch(e){}
+        current = await _ghGetFile(STATE_FILE);
+      }catch(e){
+        console.warn('GitHub write aborted: could not verify current remote state first, refusing to guess.', e);
+        localStorage.setItem(key, value);
+        showToast('⚠️ Sync skipped — could not verify your saved data first. Your latest changes are cached locally; they\'ll sync once your connection is stable.');
+        return;
+      }
+      current = current || {};
 
+      try{
         // ── Safety net ──────────────────────────────────────────────────
         // Never let a near-empty local value silently wipe out substantial
-        // saved progress already on GitHub. This is what stops a failed
+        // saved progress already on GitHub. This is what stops a degraded
         // load (network hiccup, cleared session, etc.) from turning into
         // an accidental full-history wipe on the next auto-save.
         let newParsed;
@@ -1174,6 +1188,7 @@ async function _doLoadState(){
   try{
     const r=await window.storage.get(DK);
     state=r?JSON.parse(r.value):{};
+    if(_lastGetDegraded) loadFailed=true; // get() fell back internally due to a real GitHub error — treat like a failed load
   }catch(e){
     state={};
     loadFailed=true;
