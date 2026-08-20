@@ -1078,7 +1078,25 @@ window.storage = {
         // Read current file first to get fresh SHA and merge
         let current = {};
         try{ current = await _ghGetFile(STATE_FILE) || {}; }catch(e){}
-        current[key] = JSON.parse(value);
+
+        // ── Safety net ──────────────────────────────────────────────────
+        // Never let a near-empty local value silently wipe out substantial
+        // saved progress already on GitHub. This is what stops a failed
+        // load (network hiccup, cleared session, etc.) from turning into
+        // an accidental full-history wipe on the next auto-save.
+        let newParsed;
+        try{ newParsed = JSON.parse(value); }catch(e){ newParsed = value; }
+        const prevVal = current[key];
+        const prevCount = prevVal && typeof prevVal==='object' ? Object.keys(prevVal).length : 0;
+        const newCount  = newParsed && typeof newParsed==='object' ? Object.keys(newParsed).length : 0;
+        if(prevCount>=5 && newCount < prevCount*0.3){
+          console.warn(`Blocked a sync that would shrink saved progress from ${prevCount} to ${newCount} entries — likely a failed load, not a real edit. Saved a local backup instead.`);
+          localStorage.setItem(key+'_blocked_backup', value);
+          showToast('⚠️ Sync paused — your latest changes look incomplete, so nothing was overwritten. Reload the page.');
+          return;
+        }
+
+        current[key] = newParsed;
         await _ghPutFile(STATE_FILE, current);
       }catch(e){
         console.warn('GitHub write failed, saving to localStorage:', e);
@@ -1152,10 +1170,14 @@ async function initState(){
 }
 
 async function _doLoadState(){
+  let loadFailed=false;
   try{
     const r=await window.storage.get(DK);
     state=r?JSON.parse(r.value):{};
-  }catch(e){state={};}
+  }catch(e){
+    state={};
+    loadFailed=true;
+  }
   // Backup banner hidden — state now syncs to GitHub automatically
   cf='to-read';
   /* INSIGHTS BACKFILL (commented out — re-enable with insights feature)
@@ -1169,7 +1191,14 @@ async function _doLoadState(){
   });
   */
 
-  ss(state);
+  // Don't auto-save right after a failed load — doing so would push an
+  // empty/incomplete state and silently overwrite whatever's saved remotely.
+  // Just re-fetch on the next real edit instead.
+  if(loadFailed){
+    showToast('⚠️ Could not load your saved progress — check your connection and reload before making changes');
+  } else {
+    ss(state);
+  }
   render();
   refreshTopicDropdown();
 }
